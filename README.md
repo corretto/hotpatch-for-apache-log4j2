@@ -69,4 +69,6 @@ com.sun.tools.attach.AttachNotSupportedException: Unable to open socket file: ta
 	at Log4jHotPatch.loadInstrumentationAgent(Log4jHotPatch.java:182)
 	at Log4jHotPatch.main(Log4jHotPatch.java:259)
 ```
-this means you're running as a different user (including root) than the target JVM. JDK 8 can't handle patching as root user (and triggers a thread dump in the target JVM which is harmless). In JDK 11 patching a non-root process from a root process works just fine.
+this means you're running as a different user (including root) than the target JVM. JDK 8 can't handle patching as root user (and triggers a thread dump in the target JVM which is harmless). In JDK 11 patching a non-root process from a root process works just fine. 
+
+**Important:** If you attempted to patch as the wrong user, you may need to delete `.attach_pid<pid>` files (found in `/tmp` and/or the CWD of the VM process) before trying again. These files need to have the right ownership for attach to succeed.
