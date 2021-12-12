@@ -59,7 +59,7 @@ import jdk.internal.org.objectweb.asm.Opcodes;
  * 2. You are unable to change the system property as per
  * https://logging.apache.org/log4j/2.x/security.html and/or restart your JVM
  * 3. You are willing to risk freezing your live running JVM (which would mean
- * you would have to restart it anyhow.
+ * you would have to restart it anyhow.)
  * <p>
  * This is a class is an all-in-one utility that:
  * <p>
