@@ -14,7 +14,7 @@ JDK 8
 javac -XDignore.symbol.file=true -cp <java-home>/lib/tools.jar Log4jHotPatch.java
 ```
 
-JDK 11
+JDK 11+
 ```
 javac --add-exports java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED --add-exports=jdk.internal.jvmstat/sun.jvmstat.monitor=ALL-UNNAMED Log4jHotPatch.java
 ```
@@ -45,11 +45,7 @@ Simply add the agent to your java command line as follows:
 java -classpath <class-path> -javaagent:Log4HotjPatch.jar <main-class> <arguments>
 ```
 
-To make this tool as simple and self-contained as possible, it uses OpenJDK's internal 
-copy of the [ObjectWeb ASM](https://asm.ow2.io/) library in the target JVM. 
-In JDK 17 the strong encapsulation of this library can only be bypassed with a 
-command line option. This is why the reason why applications running on JDK 17 
-can currently only be patched with the static version of the agent:
+To make this tool as simple and self-contained as possible, it uses OpenJDK's internal copy of the [ObjectWeb ASM](https://asm.ow2.io/) library in the target JVM. In JDK 17 the strong encapsulation of this library can only be bypassed with a command line option. This is why the reason why applications running on JDK 17 can currently only be patched with the static version of the agent:
 ```
 java --add-exports=java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED -classpath <class-path> -javaagent:Log4HotjPatch.jar <main-class> <arguments>
 ```
