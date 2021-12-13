@@ -55,11 +55,18 @@ public class Log4jHotPatch {
   // property name for the agent version
   private static final String LOG4J_FIXER_AGENT_VERSION = "log4jFixerAgentVersion";
 
-  private static boolean verbose = Boolean.parseBoolean(System.getProperty(LOG4J_FIXER_VERBOSE, "true"));
+  private static boolean verbose;
+
+  private static boolean agentLoaded = false;
 
   static {
     // set the version of this agent
-    System.setProperty(LOG4J_FIXER_AGENT_VERSION, String.valueOf(log4jFixerAgentVersion));
+    try {
+      System.setProperty(LOG4J_FIXER_AGENT_VERSION, String.valueOf(log4jFixerAgentVersion));
+    } catch (Exception e) {
+      log("Warning: Could not record agent version in system property: " + e.getMessage());
+      log("Warning: This will make it more difficult to test if agent is already loaded, but will not prevent patching");
+    }
   }
 
   private static void log(String message) {
@@ -92,6 +99,11 @@ public class Log4jHotPatch {
   }
 
   public static void agentmain(String args, Instrumentation inst) {
+
+    if (agentLoaded) {
+      log("Info: hot patch agent already loaded");
+      return;
+    }
 
     verbose = args == null || "log4jFixerVerbose=true".equals(args);
     int asm = asmVersion();
@@ -145,6 +157,7 @@ public class Log4jHotPatch {
     // Re-add the transformer with 'canRetransform' set to false
     // for class instances which might get loaded in the future.
     inst.addTransformer(transformer, false);
+    agentLoaded = true;
   }
 
   public static void premain(String args, Instrumentation inst) {
@@ -248,6 +261,7 @@ public class Log4jHotPatch {
   }
 
   public static void main(String args[]) throws Exception {
+    verbose = Boolean.parseBoolean(System.getProperty(LOG4J_FIXER_VERBOSE, "true"));
 
     String pid[];
     if (args.length == 0) {
