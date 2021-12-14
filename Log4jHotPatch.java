@@ -1,14 +1,14 @@
 /*
 * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 *
-* Licensed under the Apache License, Version 2.0 (the "License").
+* Licensed under the Apache License, Version 2.0 (the “License”).
 * You may not use this file except in compliance with the License.
 * A copy of the License is located at
 *
 *  http://aws.amazon.com/apache2.0
 *
-* or in the "license" file accompanying this file. This file is distributed
-* on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+* or in the “license” file accompanying this file. This file is distributed
+* on an “AS IS” BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
 * express or implied. See the License for the specific language governing
 * permissions and limitations under the License.
 */
@@ -46,8 +46,10 @@ import jdk.internal.org.objectweb.asm.Opcodes;
 
 public class Log4jHotPatch {
 
+  private static int count = 1;
+
   // version of this agent
-  private static final int log4jFixerAgentVersion = 1;
+  private static final int log4jFixerAgentVersion = 2;
 
   // property name for verbose flag
   public static final String LOG4J_FIXER_VERBOSE = "log4jFixerVerbose";
@@ -107,10 +109,28 @@ public class Log4jHotPatch {
             MethodInstrumentorClassVisitor cv = new MethodInstrumentorClassVisitor(asm, cw);
             ClassReader cr = new ClassReader(classfileBuffer);
             cr.accept(cv, 0);
+
+            return cw.toByteArray();
+          } else if (className != null && className.endsWith("org/apache/log4j/net/SocketServer")) {
+            log("Transforming " + className + " (" + loader + ")");
+            ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+            SocketServerMethodInstrumentorClassVisitor sscv = new SocketServerMethodInstrumentorClassVisitor(asm, cw);
+            ClassReader cr = new ClassReader(classfileBuffer);
+            cr.accept(sscv, 0);
+            return cw.toByteArray();
+          } else if (className != null && className.endsWith("org/apache/log4j/net/JMSAppender")) {
+            log("Transforming " + className + " (" + loader + ")");
+            ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+            JMSAppenderMethodInstrumentorClassVisitor jmcv = new JMSAppenderMethodInstrumentorClassVisitor(asm, cw);
+            ClassReader cr = new ClassReader(classfileBuffer);
+
+            cr.accept(jmcv, 0);
             return cw.toByteArray();
           } else {
             return null;
           }
+
+
         }
       };
 
@@ -121,7 +141,10 @@ public class Log4jHotPatch {
 
       for (Class<?> c : inst.getAllLoadedClasses()) {
         String className = c.getName();
-        if (className.endsWith("org.apache.logging.log4j.core.lookup.JndiLookup")) {
+        if (className.endsWith("org.apache.logging.log4j.core.lookup.JndiLookup") ||
+            className.endsWith("org.apache.log4j.net.SocketServer") ||
+            className.endsWith("org.apache.log4j.net.JMSAppender")
+        ) {
           log("Patching " + c + " (" + c.getClassLoader() + ")");
           try {
             inst.retransformClasses(c);
@@ -170,6 +193,84 @@ public class Log4jHotPatch {
     }
   }
 
+  static class SocketServerMethodInstrumentorClassVisitor extends ClassVisitor {
+    private int asm;
+
+    public SocketServerMethodInstrumentorClassVisitor(int asm, ClassVisitor cv) {
+      super(asm, cv);
+      this.asm = asm;
+    }
+
+    @Override
+    public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
+      MethodVisitor mv = cv.visitMethod(access, name, desc, signature, exceptions);
+      if ("init".equals(name) || "main".equals(name)) {
+        mv = new EmptyVoidMethodInstrumentorMethodVisitor(asm, mv);
+      }
+      return mv;
+    }
+  }
+
+  static class JMSAppenderMethodInstrumentorClassVisitor extends ClassVisitor {
+    private int asm;
+
+    public JMSAppenderMethodInstrumentorClassVisitor(int asm, ClassVisitor cv) {
+      super(asm, cv);
+      this.asm = asm;
+    }
+
+    @Override
+    public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
+      MethodVisitor mv = cv.visitMethod(access, name, desc, signature, exceptions);
+      if ("activateOptions".equals(name) || "append".equals(name) || "close".equals(name)) {
+        mv = new EmptyVoidMethodInstrumentorMethodVisitor(asm, mv);
+      } else if ("lookup".equals(name)) {
+        mv = new EmptyObjectMethodInstrumentorMethodVisitor(asm, mv);
+      } else if ("checkEntryConditions".equals(name)) {
+        mv = new EmptyBooleanMethodInstrumentorMethodVisitor(asm, mv);
+      }
+      return mv;
+    }
+  }
+
+  static class EmptyVoidMethodInstrumentorMethodVisitor extends MethodVisitor implements Opcodes {
+
+    public EmptyVoidMethodInstrumentorMethodVisitor(int asm, MethodVisitor mv) {
+      super(asm, mv);
+    }
+
+    @Override
+    public void visitCode() {
+        mv.visitInsn(RETURN);
+    }
+  }
+
+  static class EmptyObjectMethodInstrumentorMethodVisitor extends MethodVisitor implements Opcodes {
+
+    public EmptyObjectMethodInstrumentorMethodVisitor(int asm, MethodVisitor mv) {
+      super(asm, mv);
+    }
+
+    @Override
+    public void visitCode() {
+      mv.visitInsn(ACONST_NULL);
+      mv.visitInsn(ARETURN);
+    }
+  }
+
+  static class EmptyBooleanMethodInstrumentorMethodVisitor extends MethodVisitor implements Opcodes {
+
+    public EmptyBooleanMethodInstrumentorMethodVisitor(int asm, MethodVisitor mv) {
+      super(asm, mv);
+    }
+
+    @Override
+    public void visitCode() {
+      mv.visitInsn(ICONST_1);
+      mv.visitInsn(IRETURN);
+    }
+  }
+
   static class MethodInstrumentorMethodVisitor extends MethodVisitor implements Opcodes {
 
     public MethodInstrumentorMethodVisitor(int asm, MethodVisitor mv) {
@@ -188,10 +289,15 @@ public class Log4jHotPatch {
 
   private static boolean loadInstrumentationAgent(String[] pids) throws Exception {
     boolean succeeded = true;
-    String[] innerClasses = new String[] {"", /* this is for Log4jHotPatch itself */
+        String[] innerClasses = new String[] {"", /* this is for Log4jHotPatch itself */
                                           "$1",
                                           "$MethodInstrumentorClassVisitor",
-                                          "$MethodInstrumentorMethodVisitor"};
+                                          "$MethodInstrumentorMethodVisitor",
+                                          "$SocketServerMethodInstrumentorClassVisitor",
+                                          "$JMSAppenderMethodInstrumentorClassVisitor",
+                                          "$EmptyVoidMethodInstrumentorMethodVisitor",
+                                          "$EmptyBooleanMethodInstrumentorMethodVisitor",
+                                          "$EmptyObjectMethodInstrumentorMethodVisitor"};
     // Create agent jar file on the fly
     Manifest m = new Manifest();
     m.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
