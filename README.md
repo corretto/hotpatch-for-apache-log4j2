@@ -42,12 +42,12 @@ java Log4jHotPatch <java-pid>
 
 Simply add the agent to your java command line as follows:
 ```
-java -classpath <class-path> -javaagent:Log4HotjPatch.jar <main-class> <arguments>
+java -classpath <class-path> -javaagent:Log4jHotPatch.jar <main-class> <arguments>
 ```
 
 To make this tool as simple and self-contained as possible, it uses OpenJDK's internal copy of the [ObjectWeb ASM](https://asm.ow2.io/) library in the target JVM. In JDK 17 the strong encapsulation of this library can only be bypassed with a command line option. This is why the reason why applications running on JDK 17 can currently only be patched with the static version of the agent:
 ```
-java --add-exports=java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED -classpath <class-path> -javaagent:Log4HotjPatch.jar <main-class> <arguments>
+java --add-exports=java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED -classpath <class-path> -javaagent:Log4jHotPatch.jar <main-class> <arguments>
 ```
 
 ## Known issues
@@ -73,3 +73,5 @@ com.sun.tools.attach.AttachNotSupportedException: Unable to open socket file: ta
 	at Log4jHotPatch.main(Log4jHotPatch.java:259)
 ```
 this means you're running as a different user (including root) than the target JVM. JDK 8 can't handle patching as root user (and triggers a thread dump in the target JVM which is harmless). In JDK 11 patching a non-root process from a root process works just fine.
+
+**Important:** If you attempted to patch as the wrong user, you may need to delete `.attach_pid<pid>` files (found in `/tmp` and/or the CWD of the VM process) before trying again. These files need to have the right ownership for attach to succeed.
