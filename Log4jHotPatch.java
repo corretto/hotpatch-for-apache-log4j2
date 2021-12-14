@@ -204,18 +204,16 @@ public class Log4jHotPatch {
   }
 
   static class MethodInstrumentorClassVisitor extends ClassVisitor {
-    private int asm;
 
     public MethodInstrumentorClassVisitor(int asm, ClassVisitor cv) {
       super(asm, cv);
-      this.asm = asm;
     }
 
     @Override
     public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
       MethodVisitor mv = cv.visitMethod(access, name, desc, signature, exceptions);
       if ("lookup".equals(name)) {
-        mv = new MethodInstrumentorMethodVisitor(asm, mv);
+        mv = new MethodInstrumentorMethodVisitor(api, mv);
       }
       return mv;
     }
