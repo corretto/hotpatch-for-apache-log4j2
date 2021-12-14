@@ -449,6 +449,8 @@ public class Log4jHotPatch {
 
     String jvmPidsToPatch[];
     if (args.length == 0) {
+      logInfo("Searching for JVMs to patch...");
+      logInfo("NOTE:  If your target JVMs have the -XX:+PerfDisableSharedMem flag set, then that JVM will not be detected.");
       MonitoredHost host = MonitoredHost.getMonitoredHost((String)null);
       Set<Integer> activeVms = host.activeVms();
       jvmPidsToPatch = new String[activeVms.size()];
