@@ -1,0 +1,132 @@
+<?xml version="1.0"?>
+<!--
+  ~ Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License").
+  ~ You may not use this file except in compliance with the License.
+  ~ A copy of the License is located at
+  ~
+  ~  http://aws.amazon.com/apache2.0
+  ~
+  ~ or in the "license" file accompanying this file. This file is distributed
+  ~ on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+  ~ express or implied. See the License for the specific language governing
+  ~ permissions and limitations under the License.
+  -->
+
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.amazon.corretto.hotpatch</groupId>
+    <artifactId>hotpatch-for-apache-log4j2</artifactId>
+    <version>1.3</version>
+    <packaging>jar</packaging>
+    <name>Hotpatch for Apache Log4j2</name>
+    <description>A hotpatch to address CVE-2021-44228.</description>
+
+    <url>https://aws.amazon.com/corretto</url>
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://aws.amazon.com/apache2.0</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+    <developers>
+        <developer>
+            <id>amazonwebservices</id>
+            <organization>Amazon Web Services</organization>
+            <organizationUrl>https://aws.amazon.com</organizationUrl>
+            <roles>
+                <role>developer</role>
+            </roles>
+        </developer>
+    </developers>
+
+    <properties>
+        <maven.compiler.source>1.7</maven.compiler.source>
+        <maven.compiler.target>1.7</maven.compiler.target>
+        <maven-gpg-plugin.version>1.6</maven-gpg-plugin.version>
+        <nexus-staging-maven-plugin.version>1.6.8</nexus-staging-maven-plugin.version>
+        <maven-jar-plugin.version>3.1.1</maven-jar-plugin.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <profiles>
+        <profile>
+            <id>jdk8</id>
+            <activation>
+                <jdk>1.8</jdk>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>jdk.tools</groupId>
+                    <artifactId>jdk.tools</artifactId>
+                    <version>jdk1.8.0</version>
+                    <scope>system</scope>
+                    <systemPath>${java.home}/../lib/tools.jar</systemPath>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>publishing</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>${maven-gpg-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.plugins</groupId>
+                        <artifactId>nexus-staging-maven-plugin</artifactId>
+                        <version>${nexus-staging-maven-plugin.version}</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <serverId>sonatype-nexus-staging</serverId>
+                            <nexusUrl>https://aws.oss.sonatype.org</nexusUrl>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+
+    <build>
+        <finalName>Log4jHotPatch</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>${maven-jar-plugin.version}</version>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <Implementation-Version>${project.version}</Implementation-Version>
+                            <Implementation-Title>Log4jHotPatch</Implementation-Title>
+                            <Implementation-Vendor>Amazon Corretto Team</Implementation-Vendor>
+                            <Created-by>Amazon Corretto Team</Created-by>
+                            <Agent-Class>Log4jHotPatch</Agent-Class>
+                            <Premain-Class>Log4jHotPatch</Premain-Class>
+                            <Main-Class>Log4jHotPatch</Main-Class>
+                            <Can-Redefine-Classes>true</Can-Redefine-Classes>
+                            <Can-Retransform-Classes>true</Can-Retransform-Classes>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+       </plugins>
+    </build>
+
+</project>
