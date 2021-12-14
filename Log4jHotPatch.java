@@ -79,10 +79,16 @@ public class Log4jHotPatch {
   // property name for verbose flag
   public static final String LOG4J_FIXER_VERBOSE = "log4jFixerVerbose";
 
+  // property name for interactive flag
+  public static final String LOG4J_FIXER_INTERACTIVE = "log4jFixerInteractive";
+
   // property name for the agent version
   private static final String LOG4J_FIXER_AGENT_VERSION = "log4jFixerAgentVersion";
 
   private static boolean verbose = Boolean.parseBoolean(System.getProperty(LOG4J_FIXER_VERBOSE, "true"));
+
+  // Interactive mode is off by default
+  private static boolean interactive = Boolean.parseBoolean(System.getProperty(LOG4J_FIXER_INTERACTIVE, "false"));
 
   static {
     // set the version of this agent
@@ -457,7 +463,7 @@ public class Log4jHotPatch {
         }
       }
 
-      if (count > 0) {
+      if (count > 0 && interactive) {
         logInfo("Patch all JVMs? (y/N) : ");
         try (BufferedReader in = new BufferedReader(new InputStreamReader(System.in))) {
             String answer = in.readLine();
@@ -468,6 +474,8 @@ public class Log4jHotPatch {
         }
       } else if (count > 0) {
         logInfo("Patching all JVMs!");
+      } else {
+        logInfo("No JVMs to patch.");
       }
     // TODO Extract this to its on method for SRP
     } else if (args.length == 1 && ("-h".equals(args[0]) || "-help".equals(args[0]) || "--help".equals(args[0]))) {
