@@ -5,15 +5,28 @@ This is a tool which injects a Java agent into a running JVM process. The agent 
 This has been currently only tested with JDK 8, 11, 15 and 17 on Linux!
 
 ## Building
+### Gradle
 To build on linux, mac and Windows subsystem for linux
 ```
 ./gradlew build
 ```
+
 To build on Windows
 ```
 .\gradlew.bat build
 ```
+
 Depending on the platform you are building. This will generate `build/libs/Log4jHotPatch.jar`
+
+### Maven
+
+To build using Maven use
+
+```
+mvn clean package
+```
+
+This will generate a `target/Log4jHotPatch.jar`.
 
 ## Running
 
@@ -35,9 +48,9 @@ java -classpath <class-path> -javaagent:Log4jHotPatch.jar <main-class> <argument
 ```
 
 ### Testing the agent
-There are a set of tests that can be run outside gradle.
+There are a set of tests that can be run outside Gradle or Maven.
 ```
-build-tools/bin/run_tests.sh build/libs/Log4jHotPatch.jar <JDK_ROOT>
+build-tools/bin/run_tests.sh Log4jHotPatch.jar <JDK_ROOT>
 ```
 
 ## Known issues
