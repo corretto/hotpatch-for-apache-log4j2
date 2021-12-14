@@ -24,6 +24,7 @@ import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
 import java.nio.file.Files;
 import java.nio.file.FileSystems;
+import java.security.AccessController;
 import java.security.ProtectionDomain;
 import java.util.Properties;
 import java.util.Set;
@@ -33,16 +34,11 @@ import java.util.jar.JarOutputStream;
 import java.util.jar.Manifest;
 
 import com.sun.tools.attach.VirtualMachine;
+import jdk.internal.org.objectweb.asm.*;
 import sun.jvmstat.monitor.MonitoredHost;
 import sun.jvmstat.monitor.MonitoredVm;
 import sun.jvmstat.monitor.MonitoredVmUtil;
 import sun.jvmstat.monitor.VmIdentifier;
-
-import jdk.internal.org.objectweb.asm.ClassReader;
-import jdk.internal.org.objectweb.asm.ClassVisitor;
-import jdk.internal.org.objectweb.asm.ClassWriter;
-import jdk.internal.org.objectweb.asm.MethodVisitor;
-import jdk.internal.org.objectweb.asm.Opcodes;
 
 public class Log4jHotPatch {
 
@@ -55,11 +51,15 @@ public class Log4jHotPatch {
   // property name for the agent version
   private static final String LOG4J_FIXER_AGENT_VERSION = "log4jFixerAgentVersion";
 
-  private static boolean verbose = Boolean.parseBoolean(System.getProperty(LOG4J_FIXER_VERBOSE, "true"));
+  private static boolean verbose;
 
   static {
     // set the version of this agent
-    System.setProperty(LOG4J_FIXER_AGENT_VERSION, String.valueOf(log4jFixerAgentVersion));
+    boolean verbose = true;
+    try {
+      verbose = Boolean.parseBoolean(System.getProperty(LOG4J_FIXER_VERBOSE, "true"));
+    } catch (SecurityException ignored) {}
+    Log4jHotPatch.verbose = verbose;
   }
 
   private static void log(String message) {
@@ -70,34 +70,83 @@ public class Log4jHotPatch {
 
   private static boolean staticAgent = false; // Set to true if loaded as a static agent from 'premain()'
 
-  private static int asmVersion() {
-    try {
-      Opcodes.class.getDeclaredField("ASM8");
-      return 8 << 16 | 0 << 8; // Opcodes.ASM8
-    } catch (NoSuchFieldException nsfe) {}
-    try {
-      Opcodes.class.getDeclaredField("ASM7");
-      return 7 << 16 | 0 << 8; // Opcodes.ASM7
-    } catch (NoSuchFieldException nsfe) {}
-    try {
-      Opcodes.class.getDeclaredField("ASM6");
-      return 6 << 16 | 0 << 8; // Opcodes.ASM6
-    } catch (NoSuchFieldException nsfe) {}
-    try {
-      Opcodes.class.getDeclaredField("ASM5");
-      return 5 << 16 | 0 << 8; // Opcodes.ASM5
-    } catch (NoSuchFieldException nsfe) {}
-    log("Warning: ASM5 doesn't seem to be supported");
-    return Opcodes.ASM4;
+  private static int asmVersion() { // silly, but avoids reflection which can trigger a security manager check.
+    int version = 9;
+    while (version > 4) {
+      try {
+        new ClassVisitor(version << 16) {};
+        break;
+      } catch (IllegalArgumentException ignored) {
+        version -= 1;
+      }
+    }
+    return version << 16;
   }
 
-  public static void agentmain(String args, Instrumentation inst) {
+  public static void agentmain(String args, Instrumentation inst) throws UnmodifiableClassException {
+    verbose = args == null || args.contains("log4jFixerVerbose=true");
+    final int asm = asmVersion();
+    boolean avoidSecurityManager = args == null || !args.contains("avoidSecurityManager=false");
+    if (!avoidSecurityManager) {
+      doAgentmain(asm, inst);
+      return;
+    }
+    ClassFileTransformer transformer = new ClassFileTransformer() {
+      public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
+                              ProtectionDomain protectionDomain, byte[] classfileBuffer) {
+        if (classBeingRedefined == AccessController.class) {
+          log("Transforming " + className + " (" + loader + ")");
+          ClassReader reader = new ClassReader(classfileBuffer);
+          ClassWriter writer = new ClassWriter(reader, 0);
+          reader.accept(new ClassVisitor(asm, writer) {
+            public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+              MethodVisitor methodVisitor = super.visitMethod(access, name, descriptor, signature, exceptions);
+              if (name.equals("checkPermission")) {
+                methodVisitor = new MethodVisitor(asm, methodVisitor) {
+                  public void visitCode() {
+                    super.visitCode();
+                    super.visitMethodInsn(Opcodes.INVOKESTATIC,
+                            Type.getInternalName(Thread.class),
+                            "currentThread",
+                            Type.getMethodDescriptor(Type.getType(Thread.class)),
+                            false);
+                    super.visitMethodInsn(Opcodes.INVOKEVIRTUAL,
+                            Type.getInternalName(Thread.class),
+                            "getId",
+                            Type.getMethodDescriptor(Type.LONG_TYPE),
+                            false);
+                    super.visitLdcInsn(Thread.currentThread().getId());
+                    super.visitInsn(Opcodes.LCMP);
+                    Label label = new Label();
+                    super.visitJumpInsn(Opcodes.IFNE, label);
+                    super.visitInsn(Opcodes.RETURN);
+                    super.visitLabel(label);
+                    if (asm >= (6 << 16 | 0 << 8)) { // ASM6 and later accept frames
+                      super.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+                    }
+                  }
+                };
+              }
+              return methodVisitor;
+            }
+          }, 0);
+          return writer.toByteArray();
+        }
+        return null;
+      }
+    };
+    inst.addTransformer(transformer, true);
+    try {
+      inst.retransformClasses(AccessController.class);
+      doAgentmain(asm, inst);
+    } finally {
+      inst.removeTransformer(transformer);
+    }
+    inst.retransformClasses(AccessController.class);
+  }
 
-    verbose = args == null || "log4jFixerVerbose=true".equals(args);
-    int asm = asmVersion();
+  private static void doAgentmain(int asm, Instrumentation inst) {
     log("Loading Java Agent version " + log4jFixerAgentVersion + " (using ASM" + (asm >> 16) + ").");
-
-
     ClassFileTransformer transformer = new ClassFileTransformer() {
         public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
                                 ProtectionDomain protectionDomain, byte[] classfileBuffer) {
@@ -145,9 +194,11 @@ public class Log4jHotPatch {
     // Re-add the transformer with 'canRetransform' set to false
     // for class instances which might get loaded in the future.
     inst.addTransformer(transformer, false);
+
+    System.setProperty(LOG4J_FIXER_AGENT_VERSION, String.valueOf(log4jFixerAgentVersion));
   }
 
-  public static void premain(String args, Instrumentation inst) {
+  public static void premain(String args, Instrumentation inst) throws UnmodifiableClassException {
     staticAgent = true;
     agentmain(args, inst);
   }
