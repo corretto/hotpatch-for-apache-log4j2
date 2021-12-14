@@ -13,33 +13,30 @@
 * permissions and limitations under the License.
 */
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.lang.instrument.ClassFileTransformer;
-import java.lang.instrument.Instrumentation;
-import java.lang.instrument.UnmodifiableClassException;
-import java.nio.file.Files;
-import java.nio.file.FileSystems;
-import java.security.AccessController;
-import java.security.ProtectionDomain;
-import java.util.Collections;
-import java.util.Properties;
-import java.util.Set;
-import java.util.jar.Attributes;
-import java.util.jar.JarEntry;
-import java.util.jar.JarOutputStream;
-import java.util.jar.Manifest;
-
 import com.sun.tools.attach.VirtualMachine;
 import jdk.internal.org.objectweb.asm.*;
 import sun.jvmstat.monitor.MonitoredHost;
 import sun.jvmstat.monitor.MonitoredVm;
 import sun.jvmstat.monitor.MonitoredVmUtil;
 import sun.jvmstat.monitor.VmIdentifier;
+
+import java.io.*;
+import java.lang.instrument.ClassFileTransformer;
+import java.lang.instrument.Instrumentation;
+import java.lang.instrument.UnmodifiableClassException;
+import java.lang.reflect.Method;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.security.AccessController;
+import java.security.ProtectionDomain;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.jar.Attributes;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
+import java.util.jar.Manifest;
 
 public class Log4jHotPatch {
 
@@ -154,9 +151,9 @@ public class Log4jHotPatch {
                                 ProtectionDomain protectionDomain, byte[] classfileBuffer) {
           if (className != null && className.endsWith("org/apache/logging/log4j/core/lookup/JndiLookup")) {
             log("Transforming " + className + " (" + loader + ")");
-            ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
-            MethodInstrumentorClassVisitor cv = new MethodInstrumentorClassVisitor(asm, cw);
             ClassReader cr = new ClassReader(classfileBuffer);
+            ClassWriter cw = new ClassWriter(cr, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+            MethodInstrumentorClassVisitor cv = new MethodInstrumentorClassVisitor(asm, cw);
             cr.accept(cv, 0);
             return cw.toByteArray();
           } else {
@@ -332,7 +329,6 @@ public class Log4jHotPatch {
   }
 
   public static void main(String[] args) throws Exception {
-
     String[] pid;
     if (args.length == 0) {
       MonitoredHost host = MonitoredHost.getMonitoredHost((String)null);
@@ -379,18 +375,22 @@ public class Log4jHotPatch {
 
   private static void patchModules(Instrumentation inst) {
     try {
-      Class.forName("java.lang.Module");
       doPatchModules(inst);
     } catch (Throwable ignored) {}
   }
 
-  private static void doPatchModules(Instrumentation inst) {
-    inst.redefineModule(Opcodes.class.getModule(),
+  private static void doPatchModules(Instrumentation inst) throws Throwable {
+    Method redefineModule = Instrumentation.class.getMethod("redefineModule",
+            Class.forName("java.lang.Module"), Set.class, Map.class, Map.class, Set.class, Map.class);
+    Method getModule = Class.class.getMethod("getModule");
+    Method getUnnamedModule = ClassLoader.class.getMethod("getUnnamedModule");
+    redefineModule.invoke(inst,
+            getModule.invoke(Opcodes.class),
             Collections.emptySet(),
             Collections.emptyMap(),
             Collections.singletonMap(
                     "jdk.internal.org.objectweb.asm",
-                    Collections.singleton(Log4jHotPatch.class.getClassLoader().getUnnamedModule())),
+                    Collections.singleton(getUnnamedModule.invoke(Log4jHotPatch.class.getClassLoader()))),
             Collections.emptySet(),
             Collections.emptyMap());
   }
