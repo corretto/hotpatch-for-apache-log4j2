@@ -164,6 +164,17 @@ ${JDK_DIR}/bin/java -cp ${AGENT_JAR}${CLASS_PATH} ${CLASSNAME} $VULN_PID
 
 verify_target $VULN_PID
 
+if [[ "${JVM_MV}" != "1.8" ]]; then
+  echo "******************"
+  echo "Running executable jar JDK${JVM_MV} -> JDK${JVM_MV} Test"
+  start_target ${JDK_DIR}
+  VULN_PID=$!
+
+  ${JDK_DIR}/bin/java -jar ${AGENT_JAR} $VULN_PID
+
+  verify_target $VULN_PID
+fi
+
 if [[ -z "${SKIP_SECURITY_MANAGER}" ]]; then
     echo "******************"
     echo "Running JDK${JVM_MV} -> JDK${JVM_MV} (Security Manager) Test"
