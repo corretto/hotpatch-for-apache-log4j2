@@ -186,13 +186,9 @@ public class Log4jHotPatch {
             "or otherwise changed the package name for log4j classes, then this tool may not " +
             "find them.");
       }
-
-      inst.removeTransformer(transformer);
+    } else {
+      inst.addTransformer(transformer, false);
     }
-
-    // Re-add the transformer with 'canRetransform' set to false
-    // for class instances which might get loaded in the future.
-    inst.addTransformer(transformer, false);
 
     System.setProperty(LOG4J_FIXER_AGENT_VERSION, String.valueOf(log4jFixerAgentVersion));
   }
