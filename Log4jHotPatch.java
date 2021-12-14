@@ -26,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.FileSystems;
 import java.security.AccessController;
 import java.security.ProtectionDomain;
+import java.util.Collections;
 import java.util.Properties;
 import java.util.Set;
 import java.util.jar.Attributes;
@@ -84,6 +85,7 @@ public class Log4jHotPatch {
   }
 
   public static void agentmain(String args, Instrumentation inst) throws UnmodifiableClassException {
+    patchModules(inst);
     verbose = args == null || args.contains("log4jFixerVerbose=true");
     final int asm = asmVersion();
     boolean avoidSecurityManager = args == null || !args.contains("avoidSecurityManager=false");
@@ -121,7 +123,7 @@ public class Log4jHotPatch {
                     super.visitJumpInsn(Opcodes.IFNE, label);
                     super.visitInsn(Opcodes.RETURN);
                     super.visitLabel(label);
-                    if (asm >= (6 << 16 | 0 << 8)) { // ASM6 and later accept frames
+                    if (asm >= (6 << 16)) { // ASM6 and later accept frames
                       super.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
                     }
                   }
@@ -233,7 +235,7 @@ public class Log4jHotPatch {
     }
   }
 
-  private static String myName = Log4jHotPatch.class.getName();
+  private static final String myName = Log4jHotPatch.class.getName();
 
   private static boolean loadInstrumentationAgent(String[] pids) throws Exception {
     boolean succeeded = true;
@@ -305,12 +307,16 @@ public class Log4jHotPatch {
 
   private static byte[] getBytecodes(String myName) throws Exception {
     InputStream is = Log4jHotPatch.class.getResourceAsStream(myName + ".class");
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    byte[] buf = new byte[4096];
-    int len;
-    while ((len = is.read(buf)) != -1) baos.write(buf, 0, len);
-    buf = baos.toByteArray();
-    return buf;
+    try {
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+      byte[] buf = new byte[4096];
+      int len;
+      while ((len = is.read(buf)) != -1) baos.write(buf, 0, len);
+      buf = baos.toByteArray();
+      return buf;
+    } finally {
+      is.close();
+    }
   }
 
   // This only works on Linux but it is harmless as it returns 'null'
@@ -325,9 +331,9 @@ public class Log4jHotPatch {
     }
   }
 
-  public static void main(String args[]) throws Exception {
+  public static void main(String[] args) throws Exception {
 
-    String pid[];
+    String[] pid;
     if (args.length == 0) {
       MonitoredHost host = MonitoredHost.getMonitoredHost((String)null);
       Set<Integer> pids = host.activeVms();
@@ -369,5 +375,23 @@ public class Log4jHotPatch {
           "are not supported.");
       System.exit(1);
     }
+  }
+
+  private static void patchModules(Instrumentation inst) {
+    try {
+      Class.forName("java.lang.Module");
+      doPatchModules(inst);
+    } catch (Throwable ignored) {}
+  }
+
+  private static void doPatchModules(Instrumentation inst) {
+    inst.redefineModule(Opcodes.class.getModule(),
+            Collections.emptySet(),
+            Collections.emptyMap(),
+            Collections.singletonMap(
+                    "jdk.internal.org.objectweb.asm",
+                    Collections.singleton(Log4jHotPatch.class.getClassLoader().getUnnamedModule())),
+            Collections.emptySet(),
+            Collections.emptyMap());
   }
 }
