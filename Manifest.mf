@@ -1,6 +1,0 @@
-Manifest-Version: 1.0
-Created-by: Amazon OpenJDK Team
-Agent-Class: Log4jHotPatch
-Premain-Class: Log4jHotPatch
-Can-Redefine-Classes: true
-Can-Retransform-Classes: true
