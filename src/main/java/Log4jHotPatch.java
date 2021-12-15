@@ -98,7 +98,9 @@ public class Log4jHotPatch {
         }
       };
 
-    if (!staticAgent) {
+    if (staticAgent) {
+      inst.addTransformer(transformer);
+    } else {
       int patchesApplied = 0;
 
       inst.addTransformer(transformer, true);
@@ -122,13 +124,8 @@ public class Log4jHotPatch {
             "or otherwise changed the package name for log4j classes, then this tool may not " +
             "find them.");
       }
-
-      inst.removeTransformer(transformer);
     }
 
-    // Re-add the transformer with 'canRetransform' set to false
-    // for class instances which might get loaded in the future.
-    inst.addTransformer(transformer, false);
     agentLoaded = true;
   }
 
