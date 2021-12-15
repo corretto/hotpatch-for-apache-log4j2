@@ -14,10 +14,7 @@
 */
 
 import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.Instrumentation;
@@ -27,10 +24,6 @@ import java.nio.file.FileSystems;
 import java.security.ProtectionDomain;
 import java.util.Properties;
 import java.util.Set;
-import java.util.jar.Attributes;
-import java.util.jar.JarEntry;
-import java.util.jar.JarOutputStream;
-import java.util.jar.Manifest;
 
 import com.sun.tools.attach.VirtualMachine;
 import sun.jvmstat.monitor.MonitoredHost;
@@ -77,27 +70,6 @@ public class Log4jHotPatch {
 
   private static boolean staticAgent = false; // Set to true if loaded as a static agent from 'premain()'
 
-  private static int asmVersion() {
-    try {
-      Opcodes.class.getDeclaredField("ASM8");
-      return 8 << 16 | 0 << 8; // Opcodes.ASM8
-    } catch (NoSuchFieldException nsfe) {}
-    try {
-      Opcodes.class.getDeclaredField("ASM7");
-      return 7 << 16 | 0 << 8; // Opcodes.ASM7
-    } catch (NoSuchFieldException nsfe) {}
-    try {
-      Opcodes.class.getDeclaredField("ASM6");
-      return 6 << 16 | 0 << 8; // Opcodes.ASM6
-    } catch (NoSuchFieldException nsfe) {}
-    try {
-      Opcodes.class.getDeclaredField("ASM5");
-      return 5 << 16 | 0 << 8; // Opcodes.ASM5
-    } catch (NoSuchFieldException nsfe) {}
-    log("Warning: ASM5 doesn't seem to be supported");
-    return Opcodes.ASM4;
-  }
-
   public static void agentmain(String args, Instrumentation inst) {
 
     if (agentLoaded) {
@@ -106,8 +78,8 @@ public class Log4jHotPatch {
     }
 
     verbose = args == null || "log4jFixerVerbose=true".equals(args);
-    int asm = asmVersion();
-    log("Loading Java Agent version " + log4jFixerAgentVersion + " (using ASM" + (asm >> 16) + ").");
+    int api = Opcodes.ASM9;
+    log("Loading Java Agent version " + log4jFixerAgentVersion + " (using ASM" + (api >> 16) + ").");
 
 
     ClassFileTransformer transformer = new ClassFileTransformer() {
@@ -116,7 +88,7 @@ public class Log4jHotPatch {
           if (className != null && className.endsWith("org/apache/logging/log4j/core/lookup/JndiLookup")) {
             log("Transforming " + className + " (" + loader + ")");
             ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
-            MethodInstrumentorClassVisitor cv = new MethodInstrumentorClassVisitor(asm, cw);
+            MethodInstrumentorClassVisitor cv = new MethodInstrumentorClassVisitor(api, cw);
             ClassReader cr = new ClassReader(classfileBuffer);
             cr.accept(cv, 0);
             return cw.toByteArray();
@@ -166,18 +138,15 @@ public class Log4jHotPatch {
   }
 
   static class MethodInstrumentorClassVisitor extends ClassVisitor {
-    private int asm;
-
-    public MethodInstrumentorClassVisitor(int asm, ClassVisitor cv) {
-      super(asm, cv);
-      this.asm = asm;
+    public MethodInstrumentorClassVisitor(int api, ClassVisitor cv) {
+      super(api, cv);
     }
 
     @Override
     public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
       MethodVisitor mv = cv.visitMethod(access, name, desc, signature, exceptions);
       if ("lookup".equals(name)) {
-        mv = new MethodInstrumentorMethodVisitor(asm, mv);
+        mv = new MethodInstrumentorMethodVisitor(api, mv);
       }
       return mv;
     }
@@ -185,8 +154,8 @@ public class Log4jHotPatch {
 
   static class MethodInstrumentorMethodVisitor extends MethodVisitor implements Opcodes {
 
-    public MethodInstrumentorMethodVisitor(int asm, MethodVisitor mv) {
-      super(asm, mv);
+    public MethodInstrumentorMethodVisitor(int api, MethodVisitor mv) {
+      super(api, mv);
     }
 
     @Override
