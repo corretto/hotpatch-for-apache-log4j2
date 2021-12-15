@@ -37,6 +37,7 @@ Added a suite of tests that can be configured to test the usage of different JDK
 | [#14](https://github.com/corretto/hotpatch-for-apache-log4j2/pull/14) | Add shell based tests |
 | [#19](https://github.com/corretto/hotpatch-for-apache-log4j2/pull/19) | Fixes missing `gradle/wrapper/gradle-wrapper.jar`
 
+Special thanks to [otrosien](https://github.com/otrosien), [mildsunrise](https://github.com/mildsunrise) and [rschmitt](https://github.com/rschmitt) for their contributions.
 
 ## Version: 1.0
 
