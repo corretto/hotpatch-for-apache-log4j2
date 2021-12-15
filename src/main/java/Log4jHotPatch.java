@@ -1,23 +1,20 @@
 /*
- * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the “License”).
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the “license” file accompanying this file. This file is distributed
- * on an “AS IS” BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
- */
+* Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+*
+* Licensed under the Apache License, Version 2.0 (the "License").
+* You may not use this file except in compliance with the License.
+* A copy of the License is located at
+*
+*  http://aws.amazon.com/apache2.0
+*
+* or in the "license" file accompanying this file. This file is distributed
+* on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+* express or implied. See the License for the specific language governing
+* permissions and limitations under the License.
+*/
 
 import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.Instrumentation;
@@ -27,10 +24,6 @@ import java.nio.file.FileSystems;
 import java.security.ProtectionDomain;
 import java.util.Properties;
 import java.util.Set;
-import java.util.jar.Attributes;
-import java.util.jar.JarEntry;
-import java.util.jar.JarOutputStream;
-import java.util.jar.Manifest;
 
 import com.sun.tools.attach.VirtualMachine;
 import sun.jvmstat.monitor.MonitoredHost;
@@ -38,11 +31,11 @@ import sun.jvmstat.monitor.MonitoredVm;
 import sun.jvmstat.monitor.MonitoredVmUtil;
 import sun.jvmstat.monitor.VmIdentifier;
 
-import jdk.internal.org.objectweb.asm.ClassReader;
-import jdk.internal.org.objectweb.asm.ClassVisitor;
-import jdk.internal.org.objectweb.asm.ClassWriter;
-import jdk.internal.org.objectweb.asm.MethodVisitor;
-import jdk.internal.org.objectweb.asm.Opcodes;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
 
 public class Log4jHotPatch {
 
@@ -55,11 +48,18 @@ public class Log4jHotPatch {
   // property name for the agent version
   private static final String LOG4J_FIXER_AGENT_VERSION = "log4jFixerAgentVersion";
 
-  private static boolean verbose = Boolean.parseBoolean(System.getProperty(LOG4J_FIXER_VERBOSE, "true"));
+  private static boolean verbose;
+
+  private static boolean agentLoaded = false;
 
   static {
     // set the version of this agent
-    System.setProperty(LOG4J_FIXER_AGENT_VERSION, String.valueOf(log4jFixerAgentVersion));
+    try {
+      System.setProperty(LOG4J_FIXER_AGENT_VERSION, String.valueOf(log4jFixerAgentVersion));
+    } catch (Exception e) {
+      log("Warning: Could not record agent version in system property: " + e.getMessage());
+      log("Warning: This will make it more difficult to test if agent is already loaded, but will not prevent patching");
+    }
   }
 
   private static void log(String message) {
@@ -92,6 +92,11 @@ public class Log4jHotPatch {
   }
 
   public static void agentmain(String args, Instrumentation inst) {
+
+    if (agentLoaded) {
+      log("Info: hot patch agent already loaded");
+      return;
+    }
 
     verbose = args == null || "log4jFixerVerbose=true".equals(args);
     int asm = asmVersion();
@@ -167,6 +172,7 @@ public class Log4jHotPatch {
     // Re-add the transformer with 'canRetransform' set to false
     // for class instances which might get loaded in the future.
     inst.addTransformer(transformer, false);
+    agentLoaded = true;
   }
 
   public static void premain(String args, Instrumentation inst) {
@@ -288,31 +294,7 @@ public class Log4jHotPatch {
 
   private static boolean loadInstrumentationAgent(String[] pids) throws Exception {
     boolean succeeded = true;
-    String[] innerClasses = new String[] {"", /* this is for Log4jHotPatch itself */
-        "$1",
-        "$MethodInstrumentorClassVisitor",
-        "$MethodInstrumentorMethodVisitor",
-        "$SocketServerMethodInstrumentorClassVisitor",
-        "$JMSAppenderMethodInstrumentorClassVisitor",
-        "$EmptyVoidMethodInstrumentorMethodVisitor",
-        "$EmptyBooleanMethodInstrumentorMethodVisitor",
-        "$EmptyObjectMethodInstrumentorMethodVisitor"};
-    // Create agent jar file on the fly
-    Manifest m = new Manifest();
-    m.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
-    m.getMainAttributes().put(new Attributes.Name("Agent-Class"), myName);
-    m.getMainAttributes().put(new Attributes.Name("Can-Redefine-Classes"), "true");
-    m.getMainAttributes().put(new Attributes.Name("Can-Retransform-Classes"), "true");
-    File jarFile = File.createTempFile("agent", ".jar");
-    jarFile.deleteOnExit();
-    JarOutputStream jar = new JarOutputStream(new FileOutputStream(jarFile), m);
-    for (String klass : innerClasses) {
-      String className = myName.replace('.', '/') + klass;
-      byte[] buf = getBytecodes(className);
-      jar.putNextEntry(new JarEntry(className + ".class"));
-      jar.write(buf);
-    }
-    jar.close();
+    File jarFile = new File(Log4jHotPatch.class.getProtectionDomain().getCodeSource().getLocation().toURI());
     String we = getUID("self");
     for (String pid : pids) {
       if (pid != null) {
@@ -359,16 +341,6 @@ public class Log4jHotPatch {
     return succeeded;
   }
 
-  private static byte[] getBytecodes(String myName) throws Exception {
-    InputStream is = Log4jHotPatch.class.getResourceAsStream(myName + ".class");
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    byte[] buf = new byte[4096];
-    int len;
-    while ((len = is.read(buf)) != -1) baos.write(buf, 0, len);
-    buf = baos.toByteArray();
-    return buf;
-  }
-
   // This only works on Linux but it is harmless as it returns 'null'
   // on error and null values for the UID will be ignored later on.
   private static String getUID(String pid) {
@@ -382,6 +354,7 @@ public class Log4jHotPatch {
   }
 
   public static void main(String args[]) throws Exception {
+    verbose = Boolean.parseBoolean(System.getProperty(LOG4J_FIXER_VERBOSE, "true"));
 
     String pid[];
     if (args.length == 0) {
