@@ -1,17 +1,17 @@
 /*
-* Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-*
-* Licensed under the Apache License, Version 2.0 (the “License”).
-* You may not use this file except in compliance with the License.
-* A copy of the License is located at
-*
-*  http://aws.amazon.com/apache2.0
-*
-* or in the “license” file accompanying this file. This file is distributed
-* on an “AS IS” BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
-* express or implied. See the License for the specific language governing
-* permissions and limitations under the License.
-*/
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the “License”).
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *  http://aws.amazon.com/apache2.0
+ *
+ * or in the “license” file accompanying this file. This file is distributed
+ * on an “AS IS” BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -45,8 +45,6 @@ import jdk.internal.org.objectweb.asm.MethodVisitor;
 import jdk.internal.org.objectweb.asm.Opcodes;
 
 public class Log4jHotPatch {
-
-  private static int count = 1;
 
   // version of this agent
   private static final int log4jFixerAgentVersion = 2;
@@ -101,38 +99,38 @@ public class Log4jHotPatch {
 
 
     ClassFileTransformer transformer = new ClassFileTransformer() {
-        public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
-                                ProtectionDomain protectionDomain, byte[] classfileBuffer) {
-          if (className != null && className.endsWith("org/apache/logging/log4j/core/lookup/JndiLookup")) {
-            log("Transforming " + className + " (" + loader + ")");
-            ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
-            MethodInstrumentorClassVisitor cv = new MethodInstrumentorClassVisitor(asm, cw);
-            ClassReader cr = new ClassReader(classfileBuffer);
-            cr.accept(cv, 0);
+      public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
+          ProtectionDomain protectionDomain, byte[] classfileBuffer) {
+        if (className != null && className.endsWith("org/apache/logging/log4j/core/lookup/JndiLookup")) {
+          log("Transforming " + className + " (" + loader + ")");
+          ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+          MethodInstrumentorClassVisitor cv = new MethodInstrumentorClassVisitor(asm, cw);
+          ClassReader cr = new ClassReader(classfileBuffer);
+          cr.accept(cv, 0);
 
-            return cw.toByteArray();
-          } else if (className != null && className.endsWith("org/apache/log4j/net/SocketServer")) {
-            log("Transforming " + className + " (" + loader + ")");
-            ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
-            SocketServerMethodInstrumentorClassVisitor sscv = new SocketServerMethodInstrumentorClassVisitor(asm, cw);
-            ClassReader cr = new ClassReader(classfileBuffer);
-            cr.accept(sscv, 0);
-            return cw.toByteArray();
-          } else if (className != null && className.endsWith("org/apache/log4j/net/JMSAppender")) {
-            log("Transforming " + className + " (" + loader + ")");
-            ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
-            JMSAppenderMethodInstrumentorClassVisitor jmcv = new JMSAppenderMethodInstrumentorClassVisitor(asm, cw);
-            ClassReader cr = new ClassReader(classfileBuffer);
+          return cw.toByteArray();
+        } else if (className != null && (className.endsWith("org/apache/log4j/net/SocketServer") || className.endsWith("org/apache/log4j/net/SimpleSocketServer"))) {
+          log("Transforming " + className + " (" + loader + ")");
+          ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+          SocketServerMethodInstrumentorClassVisitor sscv = new SocketServerMethodInstrumentorClassVisitor(asm, cw);
+          ClassReader cr = new ClassReader(classfileBuffer);
+          cr.accept(sscv, 0);
+          return cw.toByteArray();
+        } else if (className != null && className.endsWith("org/apache/log4j/net/JMSAppender")) {
+          log("Transforming " + className + " (" + loader + ")");
+          ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+          JMSAppenderMethodInstrumentorClassVisitor jmcv = new JMSAppenderMethodInstrumentorClassVisitor(asm, cw);
+          ClassReader cr = new ClassReader(classfileBuffer);
 
-            cr.accept(jmcv, 0);
-            return cw.toByteArray();
-          } else {
-            return null;
-          }
-
-
+          cr.accept(jmcv, 0);
+          return cw.toByteArray();
+        } else {
+          return null;
         }
-      };
+
+
+      }
+    };
 
     if (!staticAgent) {
       int patchesApplied = 0;
@@ -143,6 +141,7 @@ public class Log4jHotPatch {
         String className = c.getName();
         if (className.endsWith("org.apache.logging.log4j.core.lookup.JndiLookup") ||
             className.endsWith("org.apache.log4j.net.SocketServer") ||
+            className.endsWith("org.apache.log4j.net.SimpleSocketServer") ||
             className.endsWith("org.apache.log4j.net.JMSAppender")
         ) {
           log("Patching " + c + " (" + c.getClassLoader() + ")");
@@ -241,7 +240,7 @@ public class Log4jHotPatch {
 
     @Override
     public void visitCode() {
-        mv.visitInsn(RETURN);
+      mv.visitInsn(RETURN);
     }
   }
 
@@ -289,15 +288,15 @@ public class Log4jHotPatch {
 
   private static boolean loadInstrumentationAgent(String[] pids) throws Exception {
     boolean succeeded = true;
-        String[] innerClasses = new String[] {"", /* this is for Log4jHotPatch itself */
-                                          "$1",
-                                          "$MethodInstrumentorClassVisitor",
-                                          "$MethodInstrumentorMethodVisitor",
-                                          "$SocketServerMethodInstrumentorClassVisitor",
-                                          "$JMSAppenderMethodInstrumentorClassVisitor",
-                                          "$EmptyVoidMethodInstrumentorMethodVisitor",
-                                          "$EmptyBooleanMethodInstrumentorMethodVisitor",
-                                          "$EmptyObjectMethodInstrumentorMethodVisitor"};
+    String[] innerClasses = new String[] {"", /* this is for Log4jHotPatch itself */
+        "$1",
+        "$MethodInstrumentorClassVisitor",
+        "$MethodInstrumentorMethodVisitor",
+        "$SocketServerMethodInstrumentorClassVisitor",
+        "$JMSAppenderMethodInstrumentorClassVisitor",
+        "$EmptyVoidMethodInstrumentorMethodVisitor",
+        "$EmptyBooleanMethodInstrumentorMethodVisitor",
+        "$EmptyObjectMethodInstrumentorMethodVisitor"};
     // Create agent jar file on the fly
     Manifest m = new Manifest();
     m.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
@@ -375,8 +374,8 @@ public class Log4jHotPatch {
   private static String getUID(String pid) {
     try {
       return Files.lines(FileSystems.getDefault().getPath("/proc/" + pid + "/status")).
-        filter(l -> l.startsWith("Uid:")).
-        findFirst().get().split("\\s")[1];
+          filter(l -> l.startsWith("Uid:")).
+          findFirst().get().split("\\s")[1];
     } catch (Exception e) {
       return null;
     }
