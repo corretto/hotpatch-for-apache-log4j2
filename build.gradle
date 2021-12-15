@@ -1,0 +1,53 @@
+import org.gradle.internal.jvm.Jvm
+
+plugins {
+    id "com.github.johnrengelman.shadow" version "7.1.0"
+    id 'java'
+}
+
+group 'com.amazon.corretto.hotpatch'
+version '1.2'
+
+repositories {
+    mavenCentral()
+}
+
+jar {
+    archiveBaseName.set('Log4jHotPatch-no-shadow')
+    manifest.attributes(
+            'Implementation-Version': version,
+            'Implementation-Title': "Log4jHotPatch",
+            'Implementation-Vendor': 'Amazon Corretto Team',
+            'Created-by': 'Amazon Corretto Team',
+            'Agent-Class': 'Log4jHotPatch',
+            'Premain-Class': 'Log4jHotPatch',
+            'Main-Class': 'Log4jHotPatch',
+            'Can-Redefine-Classes': true,
+            'Can-Retransform-Classes': true,
+    )
+    jar.enabled(false)
+    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+
+}
+
+shadowJar {
+    archiveName('Log4jHotPatch.jar')
+    relocate('org.objectweb.asm', 'com.amazon.corretto.org.objectweb.asm') { }
+}
+
+compileJava {
+    sourceCompatibility = '1.8'
+    targetCompatibility = '1.8'
+}
+
+dependencies {
+    implementation 'org.ow2.asm:asm:9.2'
+    if (Jvm.current().javaVersion.java8) {
+        compileOnly files(Jvm.current().toolsJar)
+    }
+}
+
+build.dependsOn(shadowJar)
+
+test {
+}
