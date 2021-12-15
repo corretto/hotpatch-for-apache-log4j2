@@ -24,10 +24,8 @@ function start_target() {
   local jdk_dir=$1
   shift 1
 
-  pushd "${ROOT_PATH}/test"
-  ${jdk_dir}/bin/javac -cp log4jrce-piped.jar Vuln.java
-  pwd
-  ${jdk_dir}/bin/java  -cp log4jrce-piped.jar:. $* Vuln > /tmp/vuln.log &
+  pushd "${ROOT_DIR}/test"
+  ${jdk_dir}/bin/java  -cp log4j-core-2.12.1.jar:log4j-api-2.12.1.jar:. $* Vuln > /tmp/vuln.log &
   popd
 
   sleep 2
@@ -42,9 +40,8 @@ function start_static_target() {
   local jdk_dir=$1
   local agent_jar=$2
 
-  pushd "${ROOT_PATH}/test"
-  ${jdk_dir}/bin/javac -cp log4jrce-piped.jar Vuln.java
-  ${jdk_dir}/bin/java  -cp log4jrce-piped.jar:. -javaagent:${agent_jar} Vuln > /tmp/vuln.log &
+  pushd "${ROOT_DIR}/test"
+  ${jdk_dir}/bin/java  -cp log4j-core-2.12.1.jar:log4j-api-2.12.1.jar:. -javaagent:${agent_jar} Vuln > /tmp/vuln.log &
   popd
 }
 
@@ -95,14 +92,14 @@ if [[ $# -lt 2 ]]; then
     exit 1
 fi
 
-ROOT_PATH="$(pwd)"
+ROOT_DIR="$(pwd)"
 # Need fully qualified path
-AGENT_JAR=$(realpath $1)
+AGENT_JAR=$(readlink -f $1)
 JDK_DIR=$2
 shift
 shift
 
-CLASSNAME="Log4jHotPatch17"
+CLASSNAME="Log4jHotPatch"
 SKIP_STATIC=""
 SKIP_SECURITY_MANAGER=""
 while [[ $# -gt 0 ]]; do
@@ -129,15 +126,23 @@ done
 
 JVM_MV=$(${JDK_DIR}/bin/java -XshowSettings:properties -version 2>&1 |grep java.vm.specification.version | cut -d'=' -f2 | tr -d ' ')
 
-CLASS_PATH=""
-if [[ "${JVM_MV}" == "1.8" ]]; then
-    CLASS_PATH=":${JDK_DIR}/lib/tools.jar"
-fi
+case ${JVM_MV} in
+    1.7|1.8)
+        CLASS_PATH=":${JDK_DIR}/lib/tools.jar"
+        ;;
+    *)
+        CLASS_PATH=""
+    ;;
+esac
 
 JVM_OPTIONS=""
 if [[ "${JVM_MV}" == "17" ]]; then
     JVM_OPTIONS="--add-exports jdk.internal.jvmstat/sun.jvmstat.monitor=ALL-UNNAMED"
 fi
+
+pushd "${ROOT_DIR}/test"
+${JDK_DIR}/bin/javac -cp log4j-core-2.12.1.jar:log4j-api-2.12.1.jar Vuln.java
+popd
 
 echo "******************"
 echo "Running JDK${JVM_MV} -> JDK${JVM_MV} Test Idempotent"
@@ -164,7 +169,7 @@ ${JDK_DIR}/bin/java -cp ${AGENT_JAR}${CLASS_PATH} ${CLASSNAME} $VULN_PID
 
 verify_target $VULN_PID
 
-if [[ "${JVM_MV}" != "1.8" ]]; then
+if [[ "${JVM_MV}" != "1.7"  && "${JVM_MV}" != "1.8" ]]; then
   echo "******************"
   echo "Running executable jar JDK${JVM_MV} -> JDK${JVM_MV} Test"
   start_target ${JDK_DIR}
