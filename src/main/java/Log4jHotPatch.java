@@ -188,26 +188,7 @@ public class Log4jHotPatch {
 
   private static boolean loadInstrumentationAgent(String[] pids) throws Exception {
     boolean succeeded = true;
-    String[] innerClasses = new String[] {"", /* this is for Log4jHotPatch itself */
-                                          "$1",
-                                          "$MethodInstrumentorClassVisitor",
-                                          "$MethodInstrumentorMethodVisitor"};
-    // Create agent jar file on the fly
-    Manifest m = new Manifest();
-    m.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
-    m.getMainAttributes().put(new Attributes.Name("Agent-Class"), myName);
-    m.getMainAttributes().put(new Attributes.Name("Can-Redefine-Classes"), "true");
-    m.getMainAttributes().put(new Attributes.Name("Can-Retransform-Classes"), "true");
-    File jarFile = File.createTempFile("agent", ".jar");
-    jarFile.deleteOnExit();
-    JarOutputStream jar = new JarOutputStream(new FileOutputStream(jarFile), m);
-    for (String klass : innerClasses) {
-      String className = myName.replace('.', '/') + klass;
-      byte[] buf = getBytecodes(className);
-      jar.putNextEntry(new JarEntry(className + ".class"));
-      jar.write(buf);
-    }
-    jar.close();
+    File jarFile = new File(Log4jHotPatchMain.class.getProtectionDomain().getCodeSource().getLocation().toURI());
     String we = getUID("self");
     for (String pid : pids) {
       if (pid != null) {
@@ -252,16 +233,6 @@ public class Log4jHotPatch {
       }
     }
     return succeeded;
-  }
-
-  private static byte[] getBytecodes(String myName) throws Exception {
-    InputStream is = Log4jHotPatch.class.getResourceAsStream(myName + ".class");
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    byte[] buf = new byte[4096];
-    int len;
-    while ((len = is.read(buf)) != -1) baos.write(buf, 0, len);
-    buf = baos.toByteArray();
-    return buf;
   }
 
   // This only works on Linux but it is harmless as it returns 'null'
