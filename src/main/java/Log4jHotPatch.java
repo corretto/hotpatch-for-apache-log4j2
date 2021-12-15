@@ -188,7 +188,7 @@ public class Log4jHotPatch {
 
   private static boolean loadInstrumentationAgent(String[] pids) throws Exception {
     boolean succeeded = true;
-    File jarFile = new File(Log4jHotPatchMain.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+    File jarFile = new File(Log4jHotPatch.class.getProtectionDomain().getCodeSource().getLocation().toURI());
     String we = getUID("self");
     for (String pid : pids) {
       if (pid != null) {
