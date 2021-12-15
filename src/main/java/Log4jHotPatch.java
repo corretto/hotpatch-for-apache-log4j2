@@ -52,15 +52,7 @@ public class Log4jHotPatch {
 
   private static boolean agentLoaded = false;
 
-  static {
-    // set the version of this agent
-    try {
-      System.setProperty(LOG4J_FIXER_AGENT_VERSION, String.valueOf(log4jFixerAgentVersion));
-    } catch (Exception e) {
-      log("Warning: Could not record agent version in system property: " + e.getMessage());
-      log("Warning: This will make it more difficult to test if agent is already loaded, but will not prevent patching");
-    }
-  }
+  private static boolean staticAgent = false; // Set to true if loaded as a static agent from 'premain()'
 
   private static void log(String message) {
     if (verbose) {
@@ -127,6 +119,15 @@ public class Log4jHotPatch {
     }
 
     agentLoaded = true;
+
+    // set the version of this agent in a system property so that
+    // subsequent clients can read it and skip re-patching.
+    try {
+      System.setProperty(LOG4J_FIXER_AGENT_VERSION, String.valueOf(log4jFixerAgentVersion));
+    } catch (Exception e) {
+      log("Warning: Could not record agent version in system property: " + e.getMessage());
+      log("Warning: This will make it more difficult to test if agent is already loaded, but will not prevent patching");
+    }
   }
 
   public static void premain(String args, Instrumentation inst) {
