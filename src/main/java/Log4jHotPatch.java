@@ -19,9 +19,11 @@ import java.io.InputStreamReader;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.FileSystems;
 import java.security.ProtectionDomain;
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
@@ -60,8 +62,6 @@ public class Log4jHotPatch {
     }
   }
 
-  private static boolean staticAgent = false; // Set to true if loaded as a static agent from 'premain()'
-
   public static void agentmain(String args, Instrumentation inst) {
 
     if (agentLoaded) {
@@ -70,7 +70,7 @@ public class Log4jHotPatch {
     }
 
     verbose = args == null || "log4jFixerVerbose=true".equals(args);
-    int api = Opcodes.ASM9;
+    final int api = Opcodes.ASM9;
     log("Loading Java Agent version " + log4jFixerAgentVersion + " (using ASM" + (api >> 16) + ").");
 
 
@@ -219,12 +219,16 @@ public class Log4jHotPatch {
   // on error and null values for the UID will be ignored later on.
   private static String getUID(String pid) {
     try {
-      return Files.lines(FileSystems.getDefault().getPath("/proc/" + pid + "/status")).
-        filter(l -> l.startsWith("Uid:")).
-        findFirst().get().split("\\s")[1];
+      List<String> lines = Files.readAllLines(FileSystems.getDefault().getPath("/proc/" + pid + "/status"), StandardCharsets.UTF_8);
+      for (String line : lines) {
+        if (line.startsWith("Uid:")) {
+          return line.split("\\s")[1];
+        }
+      }
     } catch (Exception e) {
       return null;
     }
+    return null;
   }
 
   public static void main(String args[]) throws Exception {
