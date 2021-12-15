@@ -64,6 +64,20 @@ com.sun.tools.attach.AttachNotSupportedException: Unable to open socket file: ta
 ```
 this means you're running as a different user (including root) than the target JVM. JDK 8 can't handle patching as root user (and triggers a thread dump in the target JVM which is harmless). In JDK 11 patching a non-root process from a root process works just fine. 
 
+If you get an error like:
+```
+Exception in thread "main" java.lang.UnsatisfiedLinkError: no attach in java.library.path
+    at java.lang.ClassLoader.loadLibrary(ClassLoader.java:1860)
+    at java.lang.Runtime.loadLibrary0(Runtime.java:871)
+    at java.lang.System.loadLibrary(System.java:1124)
+    at sun.tools.attach.LinuxVirtualMachine.<clinit>(LinuxVirtualMachine.java:342)
+    at sun.tools.attach.LinuxAttachProvider.attachVirtualMachine(LinuxAttachProvider.java:63)
+    at com.sun.tools.attach.VirtualMachine.attach(VirtualMachine.java:208)
+    at Log4jHotPatch.loadInstrumentationAgent(Log4jHotPatch.java:222)
+    at Log4jHotPatch.main(Log4jHotPatch.java:313)
+```
+This means that the libattach.so library is missing in the JRE environment you are running. You should copy libattach.so from the same version of the JDK to the current environment, and then this issue can be solved.
+
 If you get an error like this in the target process:
 ```
 Exception in thread "Attach Listener" java.lang.ExceptionInInitializerError
