@@ -19,7 +19,7 @@ Depending on the platform you are building. This will generate `build/libs/Log4j
 
 JDK 8
 ```
-java -cp <java-home>/lib/tools.jar:Log4jHotPatch.jar <java-pid>
+java -cp <java-home>/lib/tools.jar:Log4jHotPatch.jar Log4jHotPatch <java-pid>
 ```
 
 JDK 11 and newer
