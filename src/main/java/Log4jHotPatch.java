@@ -33,11 +33,11 @@ import sun.jvmstat.monitor.MonitoredVm;
 import sun.jvmstat.monitor.MonitoredVmUtil;
 import sun.jvmstat.monitor.VmIdentifier;
 
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
+import com.amazon.corretto.hotpatch.org.objectweb.asm.ClassReader;
+import com.amazon.corretto.hotpatch.org.objectweb.asm.ClassVisitor;
+import com.amazon.corretto.hotpatch.org.objectweb.asm.ClassWriter;
+import com.amazon.corretto.hotpatch.org.objectweb.asm.MethodVisitor;
+import com.amazon.corretto.hotpatch.org.objectweb.asm.Opcodes;
 
 public class Log4jHotPatch {
 
@@ -233,6 +233,7 @@ public class Log4jHotPatch {
 
   public static void main(String args[]) throws Exception {
     verbose = Boolean.parseBoolean(System.getProperty(LOG4J_FIXER_VERBOSE, "true"));
+    log("Version: " + Log4jHotPatch.class.getPackage().getImplementationVersion());
 
     String pid[];
     if (args.length == 0) {
