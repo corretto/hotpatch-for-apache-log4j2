@@ -1,19 +1,19 @@
 /*
-* Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-*
-* Licensed under the Apache License, Version 2.0 (the "License").
-* You may not use this file except in compliance with the License.
-* A copy of the License is located at
-*
-*  http://aws.amazon.com/apache2.0
-*
-* or in the "license" file accompanying this file. This file is distributed
-* on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
-* express or implied. See the License for the specific language governing
-* permissions and limitations under the License.
-*/
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *  http://aws.amazon.com/apache2.0
+ *
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
 
-import java.io.BufferedReader;
+package com.amazon.corretto.hotpatch;import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -23,8 +23,6 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
-import com.amazon.corretto.hotpatch.HotPatchAgent;
-import com.amazon.corretto.hotpatch.Logger;
 import com.sun.tools.attach.VirtualMachine;
 import sun.jvmstat.monitor.MonitoredHost;
 import sun.jvmstat.monitor.MonitoredVm;
@@ -34,7 +32,7 @@ import sun.jvmstat.monitor.VmIdentifier;
 import static com.amazon.corretto.hotpatch.Constants.LOG4J_FIXER_AGENT_VERSION;
 import static com.amazon.corretto.hotpatch.Logger.log;
 
-public class Log4jHotPatch {
+public class HotPatchMain {
     public static void main(String[] args) throws Exception {
         Logger.setVerbose(args);
 
@@ -64,7 +62,7 @@ public class Log4jHotPatch {
                 log("Patching all JVMs!");
             }
         } else if (args.length == 1 && ("-h".equals(args[0]) || "-help".equals(args[0]) || "--help".equals(args[0]))) {
-            System.out.println("usage: com.amazon.corretto.hotpatch.Log4jHotPatch [<pid> [<pid> ..]]");
+            System.out.println("usage: Log4jHotPatch [<pid> [<pid> ..]]");
             System.exit(1);
             return;
         } else {
