@@ -25,7 +25,7 @@ function start_target() {
   shift 1
 
   pushd "${ROOT_DIR}/test"
-  ${jdk_dir}/bin/java  -cp log4j-core-2.12.1.jar:log4j-api-2.12.1.jar:. $* Vuln > /tmp/vuln.log &
+  ${jdk_dir}/bin/java  -cp log4j-core-2.12.1.jar:log4j-api-2.12.1.jar:. $* Vuln > /tmp/vuln.log 2> /tmp/vuln.log &
   popd
 
   sleep 2
