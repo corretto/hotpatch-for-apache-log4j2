@@ -1,0 +1,48 @@
+# Run a Maven build and test against Corretto LTS versions
+name: Maven CI
+
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          wget -O- https://apt.corretto.aws/corretto.key | sudo apt-key add -
+          sudo add-apt-repository 'deb https://apt.corretto.aws stable main'
+          sudo apt-get update
+          sudo apt-get install -y maven java-1.8.0-amazon-corretto-jdk
+
+      - name: Run Maven build
+        run: |
+          cd $GITHUB_WORKSPACE
+          mvn clean package
+
+      - name: Run Corretto 8 tests
+        run: |
+          cd $GITHUB_WORKSPACE
+          ./build-tools/bin/run_tests.sh $GITHUB_WORKSPACE/target/Log4jHotPatch.jar /usr/lib/jvm/java-1.8.0-amazon-corretto
+
+      - name: Run Corretto 11 tests
+        run: |
+          cd $GITHUB_WORKSPACE
+          sudo apt-get install -y maven java-11-amazon-corretto-jdk
+          ./build-tools/bin/run_tests.sh $GITHUB_WORKSPACE/target/Log4jHotPatch.jar /usr/lib/jvm/java-11-amazon-corretto
+
+      - name: Run Corretto 17 tests
+        run: |
+          cd $GITHUB_WORKSPACE
+          sudo apt-get install -y maven java-17-amazon-corretto-jdk
+          ./build-tools/bin/run_tests.sh $GITHUB_WORKSPACE/target/Log4jHotPatch.jar /usr/lib/jvm/java-17-amazon-corretto
