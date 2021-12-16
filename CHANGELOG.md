@@ -2,7 +2,17 @@
 
 The following sections describe the changes for each release of the hotpatch tool.
 
-## Version: 1.3.0
+## Version 1.4.0
+
+Release Date: TBD
+
+### [#39](https://github.com/corretto/hotpatch-for-apache-log4j2/pull/39) Support for multiple patches
+The tool now supports applying multiple patches to the same VM in a single attach. Existing patch has been renamed to `Log4j2_JndiNoLookup` and it is applied by default.
+
+### Ongoing Changes ###
+See [all changes](https://github.com/corretto/hotpatch-for-apache-log4j2/compare/1.3.0...main) since the previous version.
+
+## Version 1.3.0
 
 Release Date: Dec 16, 2021
 
@@ -29,7 +39,7 @@ See [all changes](https://github.com/corretto/hotpatch-for-apache-log4j2/compare
 ### Acknowledgements ###
 Special thanks to [raphw](https://github.com/raphw) and [dagnir](https://github.com/dagnir) for their contributions.
 
-## Version: 1.2
+## Version 1.2
 
 **Release Date:** Dec 15, 2021
 
@@ -61,7 +71,7 @@ See [all changes](https://github.com/corretto/hotpatch-for-apache-log4j2/compare
 ### Acknowledgements ###
 Special thanks to [otrosien](https://github.com/otrosien), [mildsunrise](https://github.com/mildsunrise) and [rschmitt](https://github.com/rschmitt) for their contributions.
 
-## Version: 1.0
+## Version 1.0
 
 Release Date: Dec 11, 2021
 
