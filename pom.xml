@@ -112,16 +112,9 @@
                 <version>${maven-jar-plugin.version}</version>
                 <configuration>
                     <archive>
+                        <manifestFile>src/main/resources/MANIFEST.MF</manifestFile>
                         <manifestEntries>
                             <Implementation-Version>${project.version}</Implementation-Version>
-                            <Implementation-Title>Log4jHotPatch</Implementation-Title>
-                            <Implementation-Vendor>Amazon Corretto Team</Implementation-Vendor>
-                            <Created-by>Amazon Corretto Team</Created-by>
-                            <Agent-Class>Log4jHotPatch</Agent-Class>
-                            <Premain-Class>Log4jHotPatch</Premain-Class>
-                            <Main-Class>Log4jHotPatch</Main-Class>
-                            <Can-Redefine-Classes>true</Can-Redefine-Classes>
-                            <Can-Retransform-Classes>true</Can-Retransform-Classes>
                         </manifestEntries>
                     </archive>
                 </configuration>
