@@ -58,7 +58,7 @@ public class Log4jHotPatch {
 
   private static void log(String message) {
     if (verbose) {
-      System.out.println(message);
+      System.err.println(message);
     }
   }
 
@@ -260,7 +260,7 @@ public class Log4jHotPatch {
         log("Patching all JVMs!");
       }
     } else if (args.length == 1 && ("-h".equals(args[0]) || "-help".equals(args[0]) || "--help".equals(args[0]))) {
-      System.out.println("usage: Log4jHotPatch [<pid> [<pid> ..]]");
+      System.err.println("usage: Log4jHotPatch [<pid> [<pid> ..]]");
       System.exit(1);
       return;
     } else {
