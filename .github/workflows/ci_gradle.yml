@@ -1,5 +1,5 @@
-# Run a Maven build and test against Corretto LTS versions
-name: Maven CI
+# Run a Gradle build and test against Corretto LTS versions
+name: Gradle CI
 
 on:
   # Triggers the workflow on push or pull request events but only for the main branch
@@ -23,26 +23,26 @@ jobs:
           wget -O- https://apt.corretto.aws/corretto.key | sudo apt-key add -
           sudo add-apt-repository 'deb https://apt.corretto.aws stable main'
           sudo apt-get update
-          sudo apt-get install -y maven java-1.8.0-amazon-corretto-jdk
+          sudo apt-get install -y java-1.8.0-amazon-corretto-jdk
 
-      - name: Run Maven build
+      - name: Run Gradle build
         run: |
           cd $GITHUB_WORKSPACE
-          mvn clean package
+          ./gradlew build
 
       - name: Run Corretto 8 tests
         run: |
           cd $GITHUB_WORKSPACE
-          ./build-tools/bin/run_tests.sh $GITHUB_WORKSPACE/target/Log4jHotPatch.jar /usr/lib/jvm/java-1.8.0-amazon-corretto
+          ./build-tools/bin/run_tests.sh $GITHUB_WORKSPACE/build/libs/Log4jHotPatch.jar /usr/lib/jvm/java-1.8.0-amazon-corretto
 
       - name: Run Corretto 11 tests
         run: |
           cd $GITHUB_WORKSPACE
           sudo apt-get install -y java-11-amazon-corretto-jdk
-          ./build-tools/bin/run_tests.sh $GITHUB_WORKSPACE/target/Log4jHotPatch.jar /usr/lib/jvm/java-11-amazon-corretto
+          ./build-tools/bin/run_tests.sh $GITHUB_WORKSPACE/build/libs/Log4jHotPatch.jar /usr/lib/jvm/java-11-amazon-corretto
 
       - name: Run Corretto 17 tests
         run: |
           cd $GITHUB_WORKSPACE
           sudo apt-get install -y java-17-amazon-corretto-jdk
-          ./build-tools/bin/run_tests.sh $GITHUB_WORKSPACE/target/Log4jHotPatch.jar /usr/lib/jvm/java-17-amazon-corretto
+          ./build-tools/bin/run_tests.sh $GITHUB_WORKSPACE/build/libs/Log4jHotPatch.jar /usr/lib/jvm/java-17-amazon-corretto
