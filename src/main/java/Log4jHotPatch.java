@@ -233,7 +233,6 @@ public class Log4jHotPatch {
 
   public static void main(String args[]) throws Exception {
     verbose = Boolean.parseBoolean(System.getProperty(LOG4J_FIXER_VERBOSE, "true"));
-    log("Version: " + Log4jHotPatch.class.getPackage().getImplementationVersion());
 
     String pid[];
     if (args.length == 0) {
