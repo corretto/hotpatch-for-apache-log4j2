@@ -2,6 +2,10 @@
 
 The following sections describe the changes for each release of the hotpatch tool.
 
+## Version: 1.3
+
+Release Date: TBD
+
 ## Version: 1.2
 
 Release Date: Dec 15, 2021
