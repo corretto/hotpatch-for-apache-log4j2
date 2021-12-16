@@ -27,7 +27,7 @@ public class Log4j2NoJndiLookup implements HotPatch {
     static {
         System.out.println("Loaded " + Log4j2NoJndiLookup.class.getClassLoader());
     }
-    private final static String NAME = "Log4jNoJndiLookup";
+    private final static String NAME = "Log4j2_NoJndiLookup";
 
     @Override
     public String getName() {
