@@ -1,9 +1,9 @@
 Manifest-Version: 1.0
 Implementation-Title: Log4jHotPatch
 Implementation-Vendor: Amazon Corretto Team
-Main-Class: Log4jHotPatch
-Agent-Class: Log4jHotPatch
-Premain-Class: Log4jHotPatch
+Main-Class: com.amazon.corretto.hotpatch.HotPatchMain
+Agent-Class: com.amazon.corretto.hotpatch.HotPatchAgent
+Premain-Class: com.amazon.corretto.hotpatch.HotPatchAgent
 Can-Retransform-Classes: true
 Can-Redefine-Classes: true
 

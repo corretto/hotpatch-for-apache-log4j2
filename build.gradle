@@ -6,7 +6,6 @@ plugins {
 
 group 'com.amazon.corretto.hotpatch'
 version = file('version.txt').text.trim()
-
 repositories {
     mavenCentral()
 }
@@ -35,5 +34,9 @@ dependencies {
     }
 }
 
-test {
+task runShellTests(type: Exec) {
+    dependsOn jar
+    commandLine 'sh', "${rootProject.projectDir}/build-tools/bin/run_tests.sh", jar.archiveFile.get(), Jvm.current().getJavaHome().toString(), '--summary'
 }
+
+test.dependsOn runShellTests

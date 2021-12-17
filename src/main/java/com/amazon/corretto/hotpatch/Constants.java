@@ -13,11 +13,9 @@
  * permissions and limitations under the License.
  */
 
-import com.amazon.corretto.hotpatch.HotPatchMain;
+package com.amazon.corretto.hotpatch;
 
-public class Log4jHotPatch {
-
-    public static void main(String[] args) throws Exception {
-        HotPatchMain.main(args);
-    }
+public class Constants {
+    // property name for the agent version
+    public static final String LOG4J_FIXER_AGENT_VERSION = "log4jFixerAgentVersion";
 }

@@ -13,11 +13,8 @@
  * permissions and limitations under the License.
  */
 
-import com.amazon.corretto.hotpatch.HotPatchMain;
-
-public class Log4jHotPatch {
-
-    public static void main(String[] args) throws Exception {
-        HotPatchMain.main(args);
+public class Empty {
+    public static void main(String[] args) {
+        System.exit(0);
     }
 }

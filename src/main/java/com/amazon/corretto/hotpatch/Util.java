@@ -13,11 +13,12 @@
  * permissions and limitations under the License.
  */
 
-import com.amazon.corretto.hotpatch.HotPatchMain;
+package com.amazon.corretto.hotpatch;
 
-public class Log4jHotPatch {
+import com.amazon.corretto.hotpatch.org.objectweb.asm.Opcodes;
 
-    public static void main(String[] args) throws Exception {
-        HotPatchMain.main(args);
+public class Util {
+    public static int asmApiVersion() {
+        return Opcodes.ASM9;
     }
 }
