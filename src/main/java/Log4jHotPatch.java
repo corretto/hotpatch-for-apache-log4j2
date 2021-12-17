@@ -24,6 +24,7 @@ import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.FileSystems;
+import java.security.AccessControlException;
 import java.security.ProtectionDomain;
 import java.util.List;
 import java.util.Properties;
@@ -55,7 +56,7 @@ public class Log4jHotPatch {
   private static boolean agentLoaded = false;
   private static Logger logger;
   private static Patcher patcher;
-  private static URLClassLoader patchLoader;
+  private static ClassLoader patchLoader;
 
   public interface Logger {
     public void log(String msg);
@@ -232,8 +233,8 @@ public class Log4jHotPatch {
     // subsequent clients can read it and skip re-patching.
     try {
       System.setProperty(LOG4J_FIXER_AGENT_VERSION, version);
-    } catch (Exception e) {
-      logger.log("Warning: Could not record agent version in system property: " + e.getMessage());
+    } catch (AccessControlException ece) {
+      logger.log("Warning: Could not record agent version in system property: " + ece.getMessage());
       logger.log("Warning: This will make it more difficult to test if agent is already loaded, but will not prevent patching");
     }
   }
@@ -302,8 +303,32 @@ public class Log4jHotPatch {
     }
     final String patcherName = defaultPatcherName;
     try{
-      URL agentFile = Log4jHotPatch.class.getProtectionDomain().getCodeSource().getLocation().toURI().toURL();
-      patchLoader = new AgentClassLoader(new URL[] { agentFile });
+      String className = Log4jHotPatch.class.getName().replace('.', '/') + ".class";
+      URL agentFile = ClassLoader.getSystemClassLoader().getResource(className);
+      String agentFileName = agentFile.toString();
+      if (agentFileName.startsWith("jar:") && agentFileName.endsWith("!/" + className)) {
+        agentFileName = agentFileName.substring("jar:".length(), agentFileName.lastIndexOf("!/" + className));
+        agentFile = new URL(agentFileName);
+      } else {
+        // This won't work if a security manager is installed
+        try {
+          agentFile = Log4jHotPatch.class.getProtectionDomain().getCodeSource().getLocation().toURI().toURL();
+        } catch (AccessControlException ace) {
+          agentFile = null;
+          logger.log("Warning: can't update because we're running with a security manager (" + ace.getMessage() + ").");
+          logger.log("Warning: this agent will always run with the initial patcher.");
+        }
+      }
+      try {
+        patchLoader = (agentFile == null) ?
+          ClassLoader.getSystemClassLoader() : new AgentClassLoader(new URL[] { agentFile });
+      } catch (AccessControlException ace) {
+        // If security manger doesn't allow us to create a class (i.e. checkCreateClassLoader() fails)
+        // we cant update the patcher. Fall back to the system class loader which always loads the initial patcher.
+        patchLoader = ClassLoader.getSystemClassLoader();
+        logger.log("Warning: can't update because we're running with a security manager (" + ace.getMessage() + ").");
+        logger.log("Warning: this agent will always run with the initial patcher.");
+      }
       Class<?> patcherClass = patchLoader.loadClass(patcherName);
       newPatcher = (Patcher)patcherClass.getDeclaredConstructor().newInstance();
     } catch (Exception e) {
