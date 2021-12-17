@@ -36,7 +36,7 @@ dependencies {
 
 task runShellTests(type: Exec) {
     dependsOn jar
-    commandLine 'sh', "${rootProject.projectDir}/build-tools/bin/run_tests.sh", jar.archiveFile.get(), Jvm.current().getJavaHome().toString()
+    commandLine 'sh', "${rootProject.projectDir}/build-tools/bin/run_tests.sh", jar.archiveFile.get(), Jvm.current().getJavaHome().toString(), '--summary'
 }
 
 test.dependsOn runShellTests

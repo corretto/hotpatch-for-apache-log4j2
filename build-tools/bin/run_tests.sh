@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -x
 set -o nounset
 set -e
 
@@ -11,6 +12,7 @@ function usage() {
     echo "    --classname <name of main class>:"
     echo "    --skip-static:  Skips tests of the static agent"
     echo "    --skip-security-manager: Skips testing with the security manager"
+    echo "    --summary: Print only test summaries"
     exit 1
 }
 
@@ -122,6 +124,10 @@ SKIP_STATIC=""
 SKIP_SECURITY_MANAGER=""
 while [[ $# -gt 0 ]]; do
     case ${1} in
+        --summary)
+            set +x
+            shift
+            ;;
         --classname)
             CLASSNAME=${2}
             shift
