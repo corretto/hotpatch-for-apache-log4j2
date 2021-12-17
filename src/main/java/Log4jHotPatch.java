@@ -281,7 +281,7 @@ public class Log4jHotPatch {
     boolean verbose = args == null || !args.contains("log4jFixerVerbose=false");
     if (agentLoaded) {
       logger.setVerbose(verbose);
-      logger.log("Info: HotPatch agent already loaded");
+      logger.log("Info: hot patch agent already loaded");
     } else {
       logger = new SimpleLogger(verbose);
       logger.log("Loading Java Agent version " + log4jFixerAgentVersion);
