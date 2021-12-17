@@ -28,7 +28,7 @@ jobs:
       - name: Run Gradle build
         run: |
           cd $GITHUB_WORKSPACE
-          ./gradlew build
+          ./gradlew jar
 
       - name: Run Corretto 8 tests
         run: |

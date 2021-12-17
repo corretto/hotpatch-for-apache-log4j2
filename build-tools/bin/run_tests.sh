@@ -99,7 +99,7 @@ JDK_DIR=$2
 shift
 shift
 
-CLASSNAME="Log4jHotPatch"
+CLASSNAME="com.amazon.corretto.hotpatch.HotPatchMain"
 SKIP_STATIC=""
 SKIP_SECURITY_MANAGER=""
 while [[ $# -gt 0 ]]; do
@@ -166,6 +166,15 @@ start_target ${JDK_DIR}
 VULN_PID=$!
 
 ${JDK_DIR}/bin/java -cp ${AGENT_JAR}${CLASS_PATH} ${CLASSNAME} $VULN_PID
+
+verify_target $VULN_PID
+
+echo "******************"
+echo "Running JDK${JVM_MV} -> JDK${JVM_MV} legacy Log4jHotPatch Test"
+start_target ${JDK_DIR}
+VULN_PID=$!
+
+${JDK_DIR}/bin/java -cp ${AGENT_JAR}${CLASS_PATH} Log4jHotPatch $VULN_PID
 
 verify_target $VULN_PID
 
