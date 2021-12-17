@@ -54,7 +54,7 @@ public class HotPatchAgent {
       return;
     }
 
-    Logger.setVerbose(args);
+    Logger.setVerbose(staticAgent, args);
     final int api = Util.asmApiVersion();
     log("Loading Java Agent version " + log4jFixerAgentVersion + " (using ASM" + (api >> 16) + ").");
 
@@ -85,7 +85,7 @@ public class HotPatchAgent {
         String className = c.getName();
         for (HotPatch patch : patches) {
           if (patch.isValidClass(className)) {
-            Logger.log("Patching + " + className + " (" + c.getClassLoader() + ") with patch " + patch.getName());
+            log("Patching + " + className + " (" + c.getClassLoader() + ") with patch " + patch.getName());
             classesToRetransform.add(c);
             ++patchesApplied;
           }
@@ -95,7 +95,7 @@ public class HotPatchAgent {
         try {
           inst.retransformClasses(classesToRetransform.toArray(new Class[0]));
         } catch (UnmodifiableClassException uce) {
-          Logger.log(String.valueOf(uce));
+          log(String.valueOf(uce));
         }
       }
 
@@ -118,6 +118,4 @@ public class HotPatchAgent {
       log("Warning: This will make it more difficult to test if agent is already loaded, but will not prevent patching");
     }
   }
-
-
 }

@@ -33,15 +33,18 @@ public class Logger {
         }
     }
 
-    public static void setVerbose(String args) {
-        verbose = args == null || args.contains(VERBOSE_PROPERTY_NAME + "=true");
-        // Override verbose setting based on System property
-        try {
-            if (System.getProperties().contains(VERBOSE_PROPERTY_NAME)) {
-                verbose = Boolean.parseBoolean(System.getProperty(VERBOSE_PROPERTY_NAME, "true"));
+    public static void setVerbose(boolean staticAgent, String args) {
+        verbose = args == null || !args.contains(VERBOSE_PROPERTY_NAME + "=false");
+        // Override verbose setting based on System property. This option is only for static agents, agents that are
+        // attached to the VM will always have a value for the VERBOSE_PROPERTY_NAME in the args that we want to keep.
+        if (staticAgent) {
+            try {
+                if (System.getProperties().contains(VERBOSE_PROPERTY_NAME)) {
+                    verbose = Boolean.parseBoolean(System.getProperty(VERBOSE_PROPERTY_NAME, "true"));
+                }
+            } catch (Exception e) {
+                // nothing to do here, ensure we don't fail due to SecurityManager
             }
-        } catch (Exception e) {
-            // nothing to do here, ensure we don't fail due to SecurityManager
         }
     }
 

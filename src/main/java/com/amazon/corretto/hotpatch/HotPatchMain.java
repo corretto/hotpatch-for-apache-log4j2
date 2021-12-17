@@ -15,12 +15,11 @@
 
 package com.amazon.corretto.hotpatch;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -34,7 +33,17 @@ import sun.jvmstat.monitor.VmIdentifier;
 import static com.amazon.corretto.hotpatch.Constants.LOG4J_FIXER_AGENT_VERSION;
 import static com.amazon.corretto.hotpatch.Logger.log;
 
+
+
 public class HotPatchMain {
+    private static final List<String> ENTRY_POINTS = new ArrayList<>();
+    static {
+        ENTRY_POINTS.add(HotPatch.class.getName());
+
+        // Add legacy entry points
+        ENTRY_POINTS.add("Log4jHotPatch");
+        ENTRY_POINTS.add("Log4jHotPatch17");
+    }
     public static void main(String[] args) throws Exception {
         Logger.setVerbose(args);
 
@@ -47,20 +56,12 @@ public class HotPatchMain {
             for (Integer p : pids) {
                 MonitoredVm jvm = host.getMonitoredVm(new VmIdentifier(p.toString()));
                 String mainClass = MonitoredVmUtil.mainClass(jvm, true);
-                if (!myName.equals(mainClass)) {
+                if (!ENTRY_POINTS.contains(mainClass)) {
                     log(p + ": " + mainClass);
                     pid[count++] = p.toString();
                 }
             }
-            if (false && count > 0) {
-                log("Patch all JVMs? (y/N) : ");
-                BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
-                String answer = in.readLine();
-                if (!"y".equals(answer)) {
-                    System.exit(1);
-                    return;
-                }
-            } else if (count > 0) {
+            if (count > 0) {
                 log("Patching all JVMs!");
             }
         } else if (args.length == 1 && ("-h".equals(args[0]) || "-help".equals(args[0]) || "--help".equals(args[0]))) {
@@ -82,15 +83,13 @@ public class HotPatchMain {
         }
     }
 
-    private static String myName = HotPatchAgent.class.getName();
-
     private static boolean loadInstrumentationAgent(String[] pids) throws Exception {
         boolean succeeded = true;
         File jarFile = new File(HotPatchAgent.class.getProtectionDomain().getCodeSource().getLocation().toURI());
         String agentArgs = Logger.getAgentLogArg();
         String we = getUID("self");
         for (String pid : pids) {
-            if (pid != null) {
+            if (pid != null && isValidPid(pid)) {
                 try {
                     // Check if we're running under the same UID like the target JVM.
                     // If not, log warning as it might fail to attach.
@@ -146,5 +145,14 @@ public class HotPatchMain {
             return null;
         }
         return null;
+    }
+
+    private static boolean isValidPid(String pidStr) {
+        try {
+            int pid = Integer.parseInt(pidStr);
+            return pid >= 0;
+        } catch (NumberFormatException nfe) {
+            return false;
+        }
     }
 }
