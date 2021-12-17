@@ -34,17 +34,21 @@ public class Logger {
     }
 
     public static void setVerbose(boolean staticAgent, String args) {
-        verbose = args == null || !args.contains(VERBOSE_PROPERTY_NAME + "=false");
-        // Override verbose setting based on System property. This option is only for static agents, agents that are
-        // attached to the VM will always have a value for the VERBOSE_PROPERTY_NAME in the args that we want to keep.
+        // First, if we are running as a static agent, check for a system property
         if (staticAgent) {
             try {
-                if (System.getProperties().contains(VERBOSE_PROPERTY_NAME)) {
-                    verbose = Boolean.parseBoolean(System.getProperty(VERBOSE_PROPERTY_NAME, "true"));
+                String propertyValue = System.getProperty(VERBOSE_PROPERTY_NAME);
+                if (propertyValue != null) {
+                    verbose = Boolean.parseBoolean(propertyValue);
                 }
             } catch (Exception e) {
-                // nothing to do here, ensure we don't fail due to SecurityManager
+                // nothing to do here, ensure we don't fail due to SecurityManager or wrong value for the property
             }
+        }
+
+        // If log4jFixerVerbose is present in the agent arguments, pick that value.
+        if (args != null && args.contains(VERBOSE_PROPERTY_NAME)) {
+            verbose = !args.contains(VERBOSE_PROPERTY_NAME + "=false");
         }
     }
 

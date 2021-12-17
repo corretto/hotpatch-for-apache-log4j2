@@ -24,9 +24,6 @@ public class Log4j2NoJndiLookup implements HotPatch {
     static final String CLASS_NAME = "org.apache.logging.log4j.core.lookup.JndiLookup";
     static final String CLASS_NAME_SLASH = CLASS_NAME.replace(".", "/");
 
-    static {
-        System.out.println("Loaded " + Log4j2NoJndiLookup.class.getClassLoader());
-    }
     private final static String NAME = "Log4j2_NoJndiLookup";
 
     @Override
