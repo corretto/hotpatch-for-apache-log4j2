@@ -25,7 +25,7 @@ function start_target() {
   shift 1
 
   pushd "${ROOT_DIR}/test"
-  ${jdk_dir}/bin/java  -cp log4j-core-2.12.1.jar:log4j-api-2.12.1.jar:. $* Vuln > /tmp/vuln.log 2> /tmp/vuln.log &
+  ${jdk_dir}/bin/java  -cp log4j-core-2.12.1.jar:log4j-api-2.12.1.jar:. $* Vuln > /tmp/vuln.log 2>&1 &
   popd
 
   sleep 2
@@ -41,7 +41,7 @@ function start_static_target() {
   local agent_jar=$2
 
   pushd "${ROOT_DIR}/test"
-  ${jdk_dir}/bin/java  -cp log4j-core-2.12.1.jar:log4j-api-2.12.1.jar:. -javaagent:${agent_jar} Vuln > /tmp/vuln.log &
+  ${jdk_dir}/bin/java  -cp log4j-core-2.12.1.jar:log4j-api-2.12.1.jar:. -javaagent:${agent_jar} Vuln > /tmp/vuln.log 2>&1 &
   popd
 }
 
@@ -151,11 +151,11 @@ start_target ${JDK_DIR}
 VULN_PID=$!
 
 ${JDK_DIR}/bin/java -cp ${AGENT_JAR}${CLASS_PATH} \
-${CLASSNAME} $VULN_PID > /tmp/client.log
+${CLASSNAME} $VULN_PID > /tmp/client.log  2>&1
 
 sleep 1
 ${JDK_DIR}/bin/java -cp ${AGENT_JAR}${CLASS_PATH} \
-${CLASSNAME} $VULN_PID > /tmp/client.log
+${CLASSNAME} $VULN_PID > /tmp/client.log  2>&1
 
 verify_target $VULN_PID
 verify_idempotent_client
@@ -168,6 +168,49 @@ VULN_PID=$!
 ${JDK_DIR}/bin/java -cp ${AGENT_JAR}${CLASS_PATH} ${CLASSNAME} $VULN_PID
 
 verify_target $VULN_PID
+
+echo "******************"
+echo "Running StdErr only JDK${JVM_MV} -> JDK${JVM_MV} Test"
+
+pushd "${ROOT_DIR}/test"
+${JDK_DIR}/bin/java  -cp log4j-core-2.12.1.jar:log4j-api-2.12.1.jar:. $* Vuln > /tmp/vuln.out 2>/tmp/vuln.err &
+VULN_PID=$!
+popd
+sleep 2
+
+${JDK_DIR}/bin/java -cp ${AGENT_JAR}${CLASS_PATH} ${CLASSNAME} $VULN_PID > /tmp/client.out 2>/tmp/client.err
+
+sleep 2
+kill $VULN_PID
+
+if [[ "$(stat -c%s /tmp/client.out)" != "0" ]]; then
+  echo "Error: something went to stdout!"
+  cat /tmp/client.out
+  exit 1
+fi
+
+if ! grep -vq "\\\[main\\\] ERROR Vuln -" /tmp/vuln.out ; then
+  echo "Error: something went to stdout!"
+  cat /tmp/vuln.out
+  exit 1
+fi
+
+echo "******************"
+echo "Running Agent StdErr only JDK${JVM_MV} -> JDK${JVM_MV} Test"
+
+pushd "${ROOT_DIR}/test"
+${JDK_DIR}/bin/java  -javaagent:${AGENT_JAR} -cp log4j-core-2.12.1.jar:log4j-api-2.12.1.jar:. $* Vuln > /tmp/vuln.out 2>/tmp/vuln.err &
+VULN_PID=$!
+popd
+
+sleep 3
+kill $VULN_PID
+
+if ! grep -vq "\\\[main\\\] ERROR Vuln -" /tmp/vuln.out ; then
+  echo "Error: something went to stdout!"
+  cat /tmp/vuln.out
+  exit 1
+fi
 
 if [[ "${JVM_MV}" != "1.7"  && "${JVM_MV}" != "1.8" ]]; then
   echo "******************"
