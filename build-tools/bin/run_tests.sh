@@ -297,6 +297,10 @@ if [[ -z "${SKIP_STATIC}" ]]; then
     echo "Running AgentMode Verbose Tests"
     echo "------------------"
 
+    # This function tests how the configuration of the verbose property behaves
+    # when the patch is running in agent mode. It takes two parameters
+    # $1 determines the value to set the system property log4jFixerVerbose.
+    # $2
     function test_static_agent_verbose() {
       static_agent_configure_verbose ${JDK_DIR} ${AGENT_JAR} $1 $2
       local result="true"

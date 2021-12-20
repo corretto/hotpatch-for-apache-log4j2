@@ -12,14 +12,11 @@ repositories {
 
 jar {
     archiveFileName.set('Log4jHotPatch.jar')
-    manifest {
-        from 'src/main/resources/MANIFEST.MF'
-        attributes (
+    manifest.from('src/main/resources/MANIFEST.MF')
+    manifest.attributes(
                 'Implementation-Version': archiveVersion.get(),
                 'Build-Jdk': System.properties.getProperty('java.version'),
-                'Created-By': "Gradle ${getGradle().getGradleVersion()}"
-        )
-    }
+                'Created-By': "Gradle ${getGradle().getGradleVersion()}")
     from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
 }
 

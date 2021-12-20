@@ -15,107 +15,310 @@
 
 package com.amazon.corretto.hotpatch;
 
-import java.lang.instrument.ClassFileTransformer;
-import java.lang.instrument.IllegalClassFormatException;
 import java.lang.instrument.Instrumentation;
-import java.lang.instrument.UnmodifiableClassException;
-import java.security.ProtectionDomain;
-import java.util.ArrayList;
-import java.util.List;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.security.AccessControlException;
+import java.util.HashMap;
+import java.util.Map;
 
-import com.amazon.corretto.hotpatch.log4j2.Log4j2NoJndiLookup;
+import com.amazon.corretto.hotpatch.interfaces.Logger;
+import com.amazon.corretto.hotpatch.interfaces.Patcher;
+import com.amazon.corretto.hotpatch.org.objectweb.asm.Opcodes;
 
-import static com.amazon.corretto.hotpatch.Logger.log;
+import static com.amazon.corretto.hotpatch.Constants.*;
 
+/**
+ * This is the main class of our agent that will apply the different patchers. One of the most important parts about
+ * this class is that it will always be loaded into the SystemClassloader, Future executions of the HotPatcher that are
+ * attached into the VM will still be executed through this class.
+ *
+ * For that reason, this class does not apply the patches directly. It attempts to load a {@link Patcher} class on its
+ * own classloader and cedes control to that class during the installation or uninstallation. As such, the
+ * {@link Patcher} and {@link Logger} interfaces represent a contract that should not be modified in future versions of
+ * this class.
+ *
+ * Copies of this class need to be backwards compatible when connecting to VMs running older versions of it, but older
+ * versions of the class may not be able to function properly if a newer version is already attached. To prevent
+ * compatibility problems a SystemProperty {@link Constants#LOG4J_FIXER_AGENT_VERSION} is set with the version of this
+ * agent. That property can be checked before installing the agent in an existing VM.
+ *
+ * What patcher to install and the location of the jar where the patcher is present (often bundled in the same one as
+ * the agent) are passed as parameters to the agent. If the agent is not able to locate or load the jar using its
+ * custom classloader, the SystemClassloader will be used, mirroring the behavior of previous versions of the tool. If
+ * the patcher to be loaded cannot be determined, the default patcher
+ * {@link com.amazon.corretto.hotpatch.patch.impl.set.Log4j2PatchSetV1} will be applied, which applies the same
+ * class transformation as older versions of this tool.
+ */
 public class HotPatchAgent {
-
   // version of this agent
-  private static final int log4jFixerAgentVersion = 1;
+  public static final int HOTPATCH_AGENT_VERSION = 2;
 
   private static boolean agentLoaded = false;
-  private static boolean staticAgent = false; // Set to true if loaded as a static agent from 'premain()'
+  private static final LoggerImpl logger = new LoggerImpl();
+  private static final Map<String, Patcher> appliedPatchers = new HashMap<>();
 
+  // Some patchers may load ASM from their own jar, others will use the version already loaded if an agent is already
+  // present. To minimize issues, the agent chooses the version of the ASM api to use
+  public static int asmApiVersion() {
+    return Opcodes.ASM9;
+  }
+
+  /**
+   * This is the entry point when the agent is loaded during startup. The main difference in this scenario will be that
+   * we only need to load our transformers, but there is no need to retransform existing classes as they have not been
+   * loaded yet. Additionally, we may not receive parameters as agent args, but as SystemProperties.
+   * @param args String representing the different arguments for the agent.
+   * @param inst An instance of instrumentation that will be used to apply the different patchers.
+   */
   public static void premain(String args, Instrumentation inst) {
-    staticAgent = true;
-    agentmain(args, inst);
-  }
-
-  private static List<HotPatch> loadPatches(String args) {
-    List<HotPatch> patches = new ArrayList<>();
-    if (Log4j2NoJndiLookup.isEnabled(args)) {
-      patches.add(new Log4j2NoJndiLookup());
+    if (args == null || !args.contains(PATCHER_NAME_ARG)) {
+      // The default patcher class. Change this if you add a new version of the Patcher.
+      String userPatcherClass = System.getProperty(PATCHER_NAME_ARG);
+      String patcherClass = (userPatcherClass != null) ? userPatcherClass : DEFAULT_PATCHER;
+      args = ((args == null) ? "" : args + ",") + PATCHER_NAME_ARG + patcherClass;
     }
-    return patches;
+    commonmain(args, inst, true /* staticAgent */);
   }
 
+  /**
+   * This is the entry point when the agent is loaded after attaching to a running VM.
+   * @param args String representing the different arguments for the agent.
+   * @param inst An instance of instrumentation that will be used to apply the different patchers.
+   */
   public static void agentmain(String args, Instrumentation inst) {
+    commonmain(args, inst, false /* staticAgent */);
+  }
+
+  /**
+   * This is the main method of the agent, and it is invoked in both scenarios, when we are attached to a running VM or
+   * when we are loaded during startup.
+   * @param args String representing the different arguments passed to the agent.
+   * @param inst An instance of instrumentation that will be used to apply the different patchers.
+   * @param staticAgent True if we are loaded as an agent during startup, false if we are being attached.
+   */
+  private static void commonmain(String args, Instrumentation inst, boolean staticAgent) {
+    logger.setVerbose(args);
     if (agentLoaded) {
-      log("Info: hot patch agent already loaded");
+      logger.log(Logger.INFO, "hot patch agent already loaded");
+    } else {
+      logger.log(Logger.INFO, "Loading Java Agent version " + HOTPATCH_AGENT_VERSION);
+      agentLoaded = true;
+      setAgentVersionProperty();
+    }
+
+    Map<String, String> processedArgs = processArgs(args);
+    if (processedArgs.containsKey("uninstall")) {
+      uninstallPatcher(processedArgs.get("uninstall"), true);
+    } else {
+      installPatcher(inst, staticAgent, processedArgs);
+    }
+  }
+
+  private static void installPatcher(Instrumentation inst, boolean staticAgent, Map<String, String> processedArgs) {
+    String patcherName = getPatcherClassName(processedArgs);
+    Patcher newPatcher;
+
+    try {
+      URL patcherJar = getPatcherJar(processedArgs);
+      newPatcher = loadPatcher(patcherName, patcherJar);
+    } catch (Exception e) {
+      logger.log(Logger.ERROR, "Can't load new Patcher " + patcherName);
       return;
     }
 
-    Logger.setVerbose(staticAgent, args);
-    final int api = Util.asmApiVersion();
-    log("Loading Java Agent version " + log4jFixerAgentVersion + " (using ASM" + (api >> 16) + ").");
+    // We have been able to load our new Patcher, but before we go on, we have to check and uninstall the previously
+    // installed patcher.
+    uninstallPatcher(newPatcher.getName(), false);
 
-    final List<HotPatch> patches = loadPatches(args);
-    ClassFileTransformer transformer = new ClassFileTransformer() {
-      @Override
-      public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer) throws IllegalClassFormatException {
-        if (className != null) {
-          for (HotPatch patch : patches) {
-            if (patch.isValidClass(className)) {
-              Logger.log("Transforming + " + className + " (" + loader + ") with patch " + patch.getName());
-              return patch.apply(classfileBuffer);
-            }
-          }
-        }
-        return null;
-      }
-    };
-
-    if (staticAgent) {
-      inst.addTransformer(transformer);
+    // Everything is ready, install the new patcher
+    int ret = newPatcher.install(processedArgs, asmApiVersion(), inst, logger, staticAgent);
+    if (ret == Patcher.SUCCESS) {
+      logger.log("Successfully installed new Patcher " + newPatcher.getVersion());
+      appliedPatchers.put(newPatcher.getName(), newPatcher);
+      setPatcherVersionProperty(newPatcher.getName(), String.valueOf(newPatcher.getVersion()));
     } else {
-      int patchesApplied = 0;
+      logger.log("Error while installing new Patcher " + newPatcher.getVersion());
+      appliedPatchers.remove(newPatcher.getName());
+      setPatcherVersionProperty(newPatcher.getName(), null);
+    }
+  }
 
-      inst.addTransformer(transformer, true);
-      List<Class<?>> classesToRetransform = new ArrayList<>();
-      for (Class<?> c : inst.getAllLoadedClasses()) {
-        String className = c.getName();
-        for (HotPatch patch : patches) {
-          if (patch.isValidClass(className)) {
-            log("Patching + " + className + " (" + c.getClassLoader() + ") with patch " + patch.getName());
-            classesToRetransform.add(c);
-            ++patchesApplied;
-          }
+  /**
+   * Uninstalls a patcher. There are two reasons we may want to uninstall a patcher. We either got a request for it
+   * directly as a command line argument, or we are uninstalling this patcher because we are replacing it with a newer
+   * version. When we are not replacing the patcher, we want to clear the associated system property, so the patcher can
+   * be applied in the future. When we are updating the patcher, the process of installing will take care of changing
+   * the value.
+   * @param patcherName Name of the patcher we want to uninstall.
+   * @param clearProperty If true, the associated system property will be cleared
+   */
+  private static void uninstallPatcher(String patcherName, boolean clearProperty) {
+    Patcher oldPatcher = appliedPatchers.remove(patcherName);
+    if (oldPatcher != null) {
+      int ret = oldPatcher.uninstall();
+      if (ret == Patcher.SUCCESS) {
+        logger.log("Successfully uninstalled old Patcher " + oldPatcher.getVersion());
+      } else {
+        logger.log("Error while uninstalling old Patcher " + oldPatcher.getVersion());
+      }
+    }
+    if (clearProperty) {
+      setPatcherVersionProperty(patcherName, null);
+    }
+  }
+
+  /**
+   * Attempt to load a patcher. If possible, this patcher will be read using a custom classloader from a jar file. If
+   * that is not possible, the patcher will be read from the System ClassLoader, limiting this to only the patchers that
+   * were bundled with the first instance of the agent that was loaded.
+   * @param patcherClassName Name of the class of the patcher to load.
+   * @param patcherJar Location of the jar from which we will try to load the patch
+   * @return The instance of patcher requested
+   * @throws Exception Reflection and ClassLoader related exceptions can be thrown by this method. Multiple things can
+   *                   go wrong.
+   */
+  private static Patcher loadPatcher(final String patcherClassName, final URL patcherJar) throws Exception {
+    ClassLoader patchLoader;
+    try {
+      patchLoader = (patcherJar == null) ?
+              ClassLoader.getSystemClassLoader() : new AgentClassLoader(new URL[] { patcherJar });
+    } catch (AccessControlException ace) {
+      // If security manger doesn't allow us to create a class (i.e. checkCreateClassLoader() fails)
+      // we cant update the patcher. Fall back to the system class loader which always loads the initial patcher.
+      patchLoader = ClassLoader.getSystemClassLoader();
+      logger.log(Logger.WARN, "Can't update because we're running with a security manager (" + ace.getMessage() + ").");
+      logger.log(Logger.WARN, "This agent will always run with the initial patcher.");
+    }
+    Class<?> patcherClass = patchLoader.loadClass(patcherClassName);
+    return (Patcher)patcherClass.getDeclaredConstructor().newInstance();
+  }
+
+  /**
+   * Agent arguments are received as a single string. This helper method will translate that into a Map of strings.
+   * Commas are used to represent different keys for the map, while equals represents the separation between a key and
+   * its value. If multiple equals are present, only the first one will be considered a separator.
+   * It is possible to have parameters with no value. In that case, an empty string will be used as the value for the
+   * corresponding key in the map.
+   * @param args The string will all the arguments received by the agent.
+   * @return A map that represents the different arguments.
+   */
+  private static Map<String, String> processArgs(String args) {
+    Map<String, String> processedArgs = new HashMap<>();
+    if (args != null) {
+      for (String arg : args.split(",")) {
+        int equalPosition = arg.indexOf("=");
+        if (equalPosition == -1) {
+          processedArgs.put(arg, "");
+        } else {
+          processedArgs.put(arg.substring(0, equalPosition), arg.substring(equalPosition + 1));
         }
       }
-      if (classesToRetransform.size() > 0) {
-        try {
-          inst.retransformClasses(classesToRetransform.toArray(new Class[0]));
-        } catch (UnmodifiableClassException uce) {
-          log(String.valueOf(uce));
-        }
-      }
+    }
+    return processedArgs;
+  }
 
-      if (patchesApplied == 0) {
-        log("Vulnerable classes were not found. This agent will continue to run " +
-            "and transform the vulnerable class if it is loaded. Note that if you have shaded " +
-            "or otherwise changed the package name for log4j classes, then this tool may not " +
-            "find them.");
+  /**
+   * Get the name of the patcher we want to install or uninstall. This will be read from the agent args, and if not
+   * present, the default patcher will be used.
+   * @param processedArgs Map of agent args split into key value pairs.
+   * @return String with the class name of the Patcher we want to operate on
+   */
+  private static String getPatcherClassName(Map<String, String> processedArgs) {
+    if (processedArgs.containsKey(PATCHER_NAME_ARG)) {
+      return processedArgs.get(PATCHER_NAME_ARG);
+    } else {
+      return DEFAULT_PATCHER;
+    }
+  }
+
+  /**
+   * The objective of this function is to locate a jar that we can load into our own ClassLoader with the actual patcher
+   * code. Three different strategies are used to get that jar path:
+   * - Based on the args received by the agent (this should always be the case when we attach).
+   * - Based on the location of the AgentClass the SystemClassloader sees.
+   * - By checking getProtectionDomain().getCodeSource().getLocation() (can fail if a Security Manager is present).
+   *
+   * If we fail all these strategies, we will not be able to use a custom classloader to load the patch, and we will
+   * have to use the Application one.
+   * @param processedArgs Map with the arguments that were passed to the agent already split into key value pairs.
+   * @return A URL for the jar from which we should load the patcher, null if we weren't able to get a jar location.
+   */
+  private static URL getPatcherJar(Map<String, String> processedArgs) {
+    // Option 1: Get the jar location from an argument
+    if (processedArgs.containsKey(Constants.PATCHER_JAR_ARG)) {
+      try {
+        return new URL(processedArgs.get(Constants.PATCHER_JAR_ARG));
+      } catch (MalformedURLException mue) {
+        // Unable to get the jar from command line arg, fallthrough
       }
     }
 
-    agentLoaded = true;
-
-    // set the version of this agent in a system property so that
-    // subsequent clients can read it and skip re-patching.
+    // Option 2, try to derive our own jar location from our path
+    String className = HotPatchAgent.class.getName().replace('.', '/') + ".class";
+    URL patcherJar = ClassLoader.getSystemClassLoader().getResource(className);
     try {
-      System.setProperty(Constants.LOG4J_FIXER_AGENT_VERSION, String.valueOf(log4jFixerAgentVersion));
-    } catch (Exception e) {
-      log("Warning: Could not record agent version in system property: " + e.getMessage());
-      log("Warning: This will make it more difficult to test if agent is already loaded, but will not prevent patching");
+      String agentFileName = patcherJar.toString();
+      // If we have been loaded from a jar we should be able to see the jar path in the class path
+      if (agentFileName.startsWith("jar:") && agentFileName.endsWith("!/" + className)) {
+        agentFileName = agentFileName.substring("jar:".length(), agentFileName.lastIndexOf("!/" + className));
+        return new URL(agentFileName);
+      }
+    } catch (MalformedURLException | NullPointerException mue) {
+      logger.log(Logger.WARN, "Unable to derive jar location from the agent class: " + mue.getMessage());
+    }
+
+    // Option 3, get the location through the protection domain, although this can fall if we have a security manager
+    // installed
+    try {
+      patcherJar = HotPatchAgent.class.getProtectionDomain().getCodeSource().getLocation().toURI().toURL();
+    } catch (AccessControlException ace) {
+      patcherJar = null;
+      logger.log(Logger.WARN, "Can't update because we're running with a security manager (" + ace.getMessage() + ").");
+      logger.log(Logger.WARN, "This agent will always run with the initial patcher.");
+    } catch (URISyntaxException | MalformedURLException use) {
+      patcherJar = null;
+      logger.log(Logger.WARN, "Unable to obtain the patcher jar location  (" + use.getMessage() + ").");
+      logger.log(Logger.WARN, "This agent will always run with the initial patcher.");
+    }
+    return patcherJar;
+  }
+
+  /**
+   * Set the version of the agent that is currently loaded in a SystemProperty. This can be done to prevent older
+   * versions of the agent to attach, as they may lead to errors. It may not be possible to set this if a
+   * SecurityManager is installed.
+   */
+  private static void setAgentVersionProperty() {
+    // set the version of this agent in a system property to prevent agents with an older version to attach.
+    try {
+      System.setProperty(Constants.LOG4J_FIXER_AGENT_VERSION, String.valueOf(HOTPATCH_AGENT_VERSION));
+    } catch (AccessControlException ece) {
+      logger.log(Logger.WARN, "Could not record agent version in system property: " + ece.getMessage());
+      logger.log(Logger.WARN, "This will make it more difficult to test if agent is already loaded, " +
+              "but will not prevent patching");
+    }
+  }
+
+  /**
+   * Set the version of the patcher that was applied as a system property. Before another agent attaches, it will check
+   * if the version of the patch it is going to apply is already there. This operation may do nothing if a
+   * SecurityManager is present.
+   * @param name Name of the patcher for which we want to store a property.
+   * @param version Version of the patcher to store. If null, the property will be cleared.
+   */
+  private static void setPatcherVersionProperty(String name, String version) {
+    try {
+      if (version == null) {
+        System.clearProperty(HOTPATCH_PATCHER_PREFIX + name);
+      } else {
+        System.setProperty(HOTPATCH_PATCHER_PREFIX + name, version);
+      }
+    } catch (AccessControlException ece) {
+      logger.log(Logger.WARN, "Could not record the patcher version in a system property: " + ece.getMessage());
+      logger.log(Logger.WARN, "This will make it more difficult to test if the patcher was already applied, " +
+              "but will not prevent patching");
     }
   }
 }
