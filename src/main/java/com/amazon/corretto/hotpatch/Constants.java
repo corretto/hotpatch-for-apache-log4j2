@@ -18,4 +18,11 @@ package com.amazon.corretto.hotpatch;
 public class Constants {
     // property name for the agent version
     public static final String LOG4J_FIXER_AGENT_VERSION = "log4jFixerAgentVersion";
+    public static final String VERBOSE_PROPERTY_NAME = "log4jFixerVerbose";
+    public static final String HOTPATCH_PATCHER_PREFIX = "corretto.hotpatch.";
+    public static final String OPERATION_ARG = "operation";
+    public static final String PATCHER_NAME_ARG = "patcherClassName";
+    public static final String PATCHER_JAR_ARG = "patcherJar";
+    public static final String DEFAULT_PATCHER = "com.amazon.corretto.hotpatch.patch.impl.set.Log4j2PatchSetV1";
+
 }
