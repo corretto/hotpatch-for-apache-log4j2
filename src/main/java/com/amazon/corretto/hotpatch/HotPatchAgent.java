@@ -73,7 +73,7 @@ public class HotPatchAgent {
   public static int asmApiVersion() {
     return Opcodes.ASM9;
   }
-
+  
   /**
    * This is the entry point when the agent is loaded during startup. The main difference in this scenario will be that
    * we only need to load our transformers, but there is no need to retransform existing classes as they have not been

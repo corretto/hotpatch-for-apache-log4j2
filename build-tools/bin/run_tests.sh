@@ -46,6 +46,19 @@ function start_static_target() {
   popd > /dev/null
 }
 
+function start_dos_test() {
+  if [[ -f /tmp/vuln2.log ]]; then
+    rm /tmp/vuln2.log
+  fi
+  local jdk_dir=$1
+  local agent_jar=$2
+
+  pushd "${ROOT_DIR}/test" > /dev/null
+  ${jdk_dir}/bin/java  -cp log4j-core-2.12.1.jar:log4j-api-2.12.1.jar:. -Dlog4j2.configurationFile=${ROOT_DIR}/src/test/resources/log4j-vuln2.properties -javaagent:${agent_jar}=patcherClassName=com.amazon.corretto.hotpatch.patch.impl.set.Log4j2PatchSetWithDisableLookups Vuln2 > /tmp/vuln2.log &
+
+  popd > /dev/null
+}
+
 function static_agent_configure_verbose() {
   if [ "$3" = "unset" ]; then
     PROP_VALUE=""
@@ -107,6 +120,25 @@ function verify_idempotent_agent() {
     fi
 }
 
+function verify_dos_test() {
+  if grep -q '${ctx:myvar} - Any string' /tmp/vuln2.log
+  then
+    echo "Test passed. JVM did not run into StackOverflow"
+  else
+    echo "Test failed. JVM failed."
+    cat /tmp/vuln2.log
+    exit 1
+  fi
+    if grep -q '${ctx:myvar} - Patched JndiLookup::lookup()' /tmp/vuln2.log
+  then
+    echo "Test passed. Patched JndiLookup::lookup"
+  else
+    echo "Test failed. Did not patch JndiLookup"
+    cat /tmp/vuln2.log
+    exit 1
+  fi
+}
+
 if [[ $# -lt 2 ]]; then
     usage
     exit 1
@@ -165,7 +197,7 @@ if [[ "${JVM_MV}" == "17" ]]; then
 fi
 
 pushd "${ROOT_DIR}/test" > /dev/null
-${JDK_DIR}/bin/javac -cp log4j-core-2.12.1.jar:log4j-api-2.12.1.jar Vuln.java Empty.java
+${JDK_DIR}/bin/javac -cp log4j-core-2.12.1.jar:log4j-api-2.12.1.jar Vuln.java Empty.java Vuln2.java
 popd > /dev/null
 
 echo
@@ -353,7 +385,17 @@ if [[ -z "${SKIP_STATIC}" ]]; then
     start_target ${JDK_DIR}
     VULN_PID=$!
 
+
     sleep 2
 
     verify_target $VULN_PID
+    unset _JAVA_OPTIONS
+    echo
+    echo "******************"
+    echo "Running Literal Pattern Converter JDK${JVM_MV} Test"
+    echo "------------------"
+
+    start_dos_test ${JDK_DIR} ${AGENT_JAR}
+    sleep 2
+    verify_dos_test
 fi
