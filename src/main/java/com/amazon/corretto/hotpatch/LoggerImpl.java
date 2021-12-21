@@ -26,7 +26,6 @@ import com.amazon.corretto.hotpatch.interfaces.Logger;
  * in verbose mode.
  */
 public class LoggerImpl implements com.amazon.corretto.hotpatch.interfaces.Logger {
-    private static final PrintStream out = System.err;
     public static final String VERBOSE_PROPERTY_NAME = "log4jFixerVerbose";
     private static final Map<Integer, String> LEVELS_TO_STRING = new HashMap<>();
     static {
@@ -59,14 +58,14 @@ public class LoggerImpl implements com.amazon.corretto.hotpatch.interfaces.Logge
     @Override
     public void log(final String message) {
         if (verbose) {
-            out.println(message);
+            System.err.println(message);
         }
     }
 
     @Override
     public void log(final Exception ex) {
         if (verbose) {
-            ex.printStackTrace(out);
+            ex.printStackTrace(System.err);
         }
     }
 
