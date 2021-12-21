@@ -260,4 +260,16 @@ if [[ -z "${SKIP_STATIC}" ]]; then
     sleep 2
 
     verify_target $VULN_PID
+
+    echo "******************"
+    echo "Running Static JAVA_TOOL_OPTIONS JDK${JVM_MV} Test"
+
+    JAVA_TOOL_OPTIONS="-javaagent:${AGENT_JAR}"
+    export JAVA_TOOL_OPTIONS
+    start_target ${JDK_DIR}
+    VULN_PID=$!
+
+    sleep 2
+
+    verify_target $VULN_PID
 fi
