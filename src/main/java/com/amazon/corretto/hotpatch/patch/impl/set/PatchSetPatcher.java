@@ -34,7 +34,6 @@ public abstract class PatchSetPatcher implements Patcher {
     private Instrumentation instrumentation;
     private Logger logger;
     private ClassFileTransformer transformer;
-    private List<ClassTransformerHotPatch> enabledPatches;
 
     protected abstract List<ClassTransformerHotPatch> getPatches();
 
@@ -44,8 +43,7 @@ public abstract class PatchSetPatcher implements Patcher {
         this.instrumentation = instrumentation;
         this.logger = logger;
 
-        this.enabledPatches = getEnabledPatches(args);
-        this.transformer = new PatchSetTransformer(enabledPatches, asmApiVersion, logger);
+        this.transformer = new PatchSetTransformer(getPatches(), asmApiVersion, logger);
 
         if (staticAgent) {
             // As we are being installed during startup, we don't care about retransforming. The transformer will
@@ -59,7 +57,7 @@ public abstract class PatchSetPatcher implements Patcher {
             boolean patchesApplied = false;
             for (Class<?> c : instrumentation.getAllLoadedClasses()) {
                 String className = c.getName();
-                for (ClassTransformerHotPatch patch : enabledPatches) {
+                for (ClassTransformerHotPatch patch : getPatches()) {
                     if (patch.isTargetClass(className)) {
                         logger.log("Patching + " + className + " (" + c.getClassLoader() + ") with patch "
                                 + patch.getName());
@@ -90,7 +88,7 @@ public abstract class PatchSetPatcher implements Patcher {
         // Retransform after we've removed the transformer to restore the initial class versions.
         for (Class<?> c : instrumentation.getAllLoadedClasses()) {
             String className = c.getName();
-            for (ClassTransformerHotPatch patch : enabledPatches) {
+            for (ClassTransformerHotPatch patch : getPatches()) {
                 if (patch.isTargetClass(className)) {
                     logger.log("Un-Patching " + c + " (" + c.getClassLoader() + ") of " + patch.getName());
                     try {
@@ -122,29 +120,6 @@ public abstract class PatchSetPatcher implements Patcher {
                    .append(System.lineSeparator());
         }
         return sb.toString();
-    }
-
-    /**
-     * Filters the result of getPatches based on the agent arguments. This is because besides what patches are defined
-     * in a patch set, some of them can be disabled via command line arguments ,
-     * @param args String with the arguments that was received by the agent,
-     * @return A list with all the patches that are enabled,
-     */
-    private List<ClassTransformerHotPatch> getEnabledPatches(final Map<String, String> args) {
-        if (args == null) {
-            return getPatches();
-        }
-        List<ClassTransformerHotPatch> enabledPatches = new ArrayList<>();
-        outer: for (ClassTransformerHotPatch patch : getPatches()) {
-            for (String key : args.keySet()) {
-                if (key.equals("disable-" + patch.getName())) {
-                    // Do not add the current patch to the list of patches to apply
-                    continue outer;
-                }
-            }
-            enabledPatches.add(patch);
-        }
-        return enabledPatches;
     }
 
     private static class PatchSetTransformer implements ClassFileTransformer {
