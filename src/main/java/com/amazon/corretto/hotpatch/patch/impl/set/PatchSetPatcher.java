@@ -34,6 +34,7 @@ public abstract class PatchSetPatcher implements Patcher {
     private Instrumentation instrumentation;
     private Logger logger;
     private ClassFileTransformer transformer;
+    private List<ClassTransformerHotPatch> enabledPatches;
 
     protected abstract List<ClassTransformerHotPatch> getPatches();
 
@@ -43,8 +44,8 @@ public abstract class PatchSetPatcher implements Patcher {
         this.instrumentation = instrumentation;
         this.logger = logger;
 
-        List<ClassTransformerHotPatch> patches = getEnabledPatches(args);
-        this.transformer = new PatchSetTransformer(patches, asmApiVersion, logger);
+        this.enabledPatches = getEnabledPatches(args);
+        this.transformer = new PatchSetTransformer(enabledPatches, asmApiVersion, logger);
 
         if (staticAgent) {
             // As we are being installed during startup, we don't care about retransforming. The transformer will
@@ -58,7 +59,7 @@ public abstract class PatchSetPatcher implements Patcher {
             boolean patchesApplied = false;
             for (Class<?> c : instrumentation.getAllLoadedClasses()) {
                 String className = c.getName();
-                for (ClassTransformerHotPatch patch : patches) {
+                for (ClassTransformerHotPatch patch : enabledPatches) {
                     if (patch.isTargetClass(className)) {
                         logger.log("Patching + " + className + " (" + c.getClassLoader() + ") with patch "
                                 + patch.getName());
@@ -72,7 +73,7 @@ public abstract class PatchSetPatcher implements Patcher {
                 }
             }
 
-            if (patchesApplied) {
+            if (!patchesApplied) {
                 logger.log("Vulnerable classes were not found. This agent will continue to run " +
                         "and transform the target classes if they are loaded. Note that if you have shaded " +
                         "or otherwise changed the package name for target classes, then this tool may not " +
@@ -89,7 +90,7 @@ public abstract class PatchSetPatcher implements Patcher {
         // Retransform after we've removed the transformer to restore the initial class versions.
         for (Class<?> c : instrumentation.getAllLoadedClasses()) {
             String className = c.getName();
-            for (ClassTransformerHotPatch patch : getPatches()) {
+            for (ClassTransformerHotPatch patch : enabledPatches) {
                 if (patch.isTargetClass(className)) {
                     logger.log("Un-Patching " + c + " (" + c.getClassLoader() + ") of " + patch.getName());
                     try {

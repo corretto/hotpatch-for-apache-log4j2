@@ -31,13 +31,17 @@ import static com.amazon.corretto.hotpatch.Constants.*;
 
 /**
  * This is the main class of our agent that will apply the different patchers. One of the most important parts about
- * this class is that it will always be loaded into the SystemClassloader, Future executions of the HotPatcher that are
- * attached into the VM will still be executed through this class.
+ * this class is that it will always be loaded into the SystemClassloader, future executions of the HotPatcher that are
+ * attached into the VM will still be executed through this class, by calling the
+ * {@link #agentmain(String, Instrumentation)} method.
  *
- * For that reason, this class does not apply the patches directly. It attempts to load a {@link Patcher} class on its
- * own classloader and cedes control to that class during the installation or uninstallation. As such, the
- * {@link Patcher} and {@link Logger} interfaces represent a contract that should not be modified in future versions of
- * this class.
+ * For that reason, this class does not apply the patches directly. If that were the case, it would not be possible to
+ * update a patch without having a different version of this class, with a different name, so it would be loaded as a
+ * different agent. The solution is that this class attempts to load a {@link Patcher} class on its own custom
+ * classloader and cedes control to it for installation and uninstallation. In order to avoid issues of classes already
+ * loaded, the custom classLoader will load classes from the jar first, and only if not found inherit from the parent
+ * classloader. The exception to this rule is classes in the {@code com.amazon.corretto.hotpatch.interfaces} package,
+ * like the {@link Patcher} and {@link Logger}.
  *
  * Copies of this class need to be backwards compatible when connecting to VMs running older versions of it, but older
  * versions of the class may not be able to function properly if a newer version is already attached. To prevent
@@ -52,15 +56,20 @@ import static com.amazon.corretto.hotpatch.Constants.*;
  * class transformation as older versions of this tool.
  */
 public class HotPatchAgent {
-  // version of this agent
+  // version of this agent, it will be stored in a property named {@link Constants#LOG4J_FIXER_AGENT_VERSION}
   public static final int HOTPATCH_AGENT_VERSION = 2;
 
+  // used to know if we are the first time the agent is being loaded
   private static boolean agentLoaded = false;
+
+  // a default implementation of the logger. By default, set to verbose, but information regarding verbosity will be set
+  // before any message is executed. Subsequent installations of the agent will not create new loggers, but they will
+  // update it to match the new configuration.
   private static final LoggerImpl logger = new LoggerImpl();
   private static final Map<String, Patcher> appliedPatchers = new HashMap<>();
 
   // Some patchers may load ASM from their own jar, others will use the version already loaded if an agent is already
-  // present. To minimize issues, the agent chooses the version of the ASM api to use
+  // present. We pick the version of ASM included with the first agent attached as the one to use.
   public static int asmApiVersion() {
     return Opcodes.ASM9;
   }
@@ -83,7 +92,9 @@ public class HotPatchAgent {
   }
 
   /**
-   * This is the entry point when the agent is loaded after attaching to a running VM.
+   * This is the entry point when the agent is loaded after attaching to a running VM. Multiple agents being attached
+   * will cause multiple executions of this method. Even if we attach a newer agent, the version of the method to
+   * execute will be the one that was loaded first.
    * @param args String representing the different arguments for the agent.
    * @param inst An instance of instrumentation that will be used to apply the different patchers.
    */

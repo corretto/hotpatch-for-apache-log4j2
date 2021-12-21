@@ -15,8 +15,12 @@
 
 package com.amazon.corretto.hotpatch.patch.impl.log4j2;
 
+import com.amazon.corretto.hotpatch.org.objectweb.asm.ClassReader;
+import com.amazon.corretto.hotpatch.org.objectweb.asm.ClassVisitor;
+import com.amazon.corretto.hotpatch.org.objectweb.asm.ClassWriter;
+import com.amazon.corretto.hotpatch.org.objectweb.asm.MethodVisitor;
+import com.amazon.corretto.hotpatch.org.objectweb.asm.Opcodes;
 import com.amazon.corretto.hotpatch.patch.ClassTransformerHotPatch;
-import com.amazon.corretto.hotpatch.org.objectweb.asm.*;
 
 /**
  * This is a small patch to the "org.apache.logging.log4j.core.lookup.JndiLookup" to ensure the lookup method always

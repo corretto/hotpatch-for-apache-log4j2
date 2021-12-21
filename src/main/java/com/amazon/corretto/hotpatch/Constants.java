@@ -16,13 +16,21 @@
 package com.amazon.corretto.hotpatch;
 
 public class Constants {
-    // property name for the agent version
+    // property name for the agent version. Name is kept for legacy reasons.
     public static final String LOG4J_FIXER_AGENT_VERSION = "log4jFixerAgentVersion";
-    public static final String VERBOSE_PROPERTY_NAME = "log4jFixerVerbose";
-    public static final String HOTPATCH_PATCHER_PREFIX = "corretto.hotpatch.";
-    public static final String OPERATION_ARG = "operation";
-    public static final String PATCHER_NAME_ARG = "patcherClassName";
-    public static final String PATCHER_JAR_ARG = "patcherJar";
-    public static final String DEFAULT_PATCHER = "com.amazon.corretto.hotpatch.patch.impl.set.Log4j2PatchSetV1";
 
+    // This prefix is used to save properties with the specific version of a patcher that was installed in the vm.
+    public static final String HOTPATCH_PATCHER_PREFIX = "corretto.hotpatch.";
+
+    // Agent argument to represent the operation we want to do.
+    public static final String OPERATION_ARG = "operation";
+
+    // Agent argument with the class of the patcher we want to load via reflection.
+    public static final String PATCHER_NAME_ARG = "patcherClassName";
+
+    // Location of the jar with the patcher that will be loaded into the AgentClassLoader.
+    public static final String PATCHER_JAR_ARG = "patcherJar";
+
+    // Class name of the default patcher.
+    public static final String DEFAULT_PATCHER = "com.amazon.corretto.hotpatch.patch.impl.set.Log4j2PatchSetV1";
 }
