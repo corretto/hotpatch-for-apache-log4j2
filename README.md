@@ -53,6 +53,27 @@ There are a set of tests that can be run outside Gradle or Maven.
 build-tools/bin/run_tests.sh Log4jHotPatch.jar <JDK_ROOT>
 ```
 
+### Disable Verbose Output
+
+With the hotpatch agent there is additional logging that in earlier versions went to stdout instead of stderr. When the output of a Java command was parsed this could cause an error due to the unexpected log lines. If you can update to a newer version of the hotpatch jar the issue should go away, for those that cannot update you can disable the output when using the static agent by appending `log4jFixerVerbose=false` or when patching a running JVM by setting the system propery `-Dlog4jFixerVerbose=false`, below are some examples.
+
+```
+# Only 1 of these needs to be set
+export JAVA_TOOL_OPTIONS=-javaagent:/opt/tools/Log4jHotPatch.jar=log4jFixerVerbose=false
+
+# or
+export _JAVA_OPTIONS=-javaagent:/opt/tools/Log4jHotPatch.jar=log4jFixerVerbose=false
+
+# or
+/path/to/java [java-args] -javaagent:/opt/tools/Log4jHotPatch.jar=log4jFixerVerbose=false
+```
+
+When using it in hotpatch mode you can run
+```
+java -Dlog4jFixerVerbose=false -jar /opt/tools/Log4jHotPatch.jar <pid_to_patch>
+```
+
+
 ## Known issues
 
 If you get an error like:
@@ -75,7 +96,7 @@ com.sun.tools.attach.AttachNotSupportedException: Unable to open socket file: ta
 	at Log4jHotPatch.loadInstrumentationAgent(Log4jHotPatch.java:182)
 	at Log4jHotPatch.main(Log4jHotPatch.java:259)
 ```
-this means you're running as a different user (including root) than the target JVM. JDK 8 can't handle patching as root user (and triggers a thread dump in the target JVM which is harmless). In JDK 11 patching a non-root process from a root process works just fine. 
+this means you're running as a different user (including root) than the target JVM. JDK 8 can't handle patching as root user (and triggers a thread dump in the target JVM which is harmless). In JDK 11 patching a non-root process from a root process works just fine.
 
 If you get an error like this in the target process:
 ```
