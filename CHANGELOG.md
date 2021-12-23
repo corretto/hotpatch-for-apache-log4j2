@@ -9,6 +9,10 @@ Release Date: TBD
 ### [#39](https://github.com/corretto/hotpatch-for-apache-log4j2/pull/39) Support for multiple patches
 The tool now supports applying multiple patches to the same VM in a single attach. Existing patch has been renamed to `Log4j2_JndiNoLookup` and it is applied by default.
 
+### [#46](https://github.com/corretto/hotpatch-for-apache-log4j2/pull/46) Add patch for CVE-2021-45105
+Patch for [CVE-2021-45105](https://nvd.nist.gov/vuln/detail/CVE-2021-45105) is added to the tool. This patches the 
+LiteralPatternConverter to disable lookups in format messages.
+
 ### Ongoing Changes ###
 See [all changes](https://github.com/corretto/hotpatch-for-apache-log4j2/compare/1.3.0...main) since the previous version.
 
