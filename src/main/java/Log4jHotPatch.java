@@ -250,8 +250,11 @@ public class Log4jHotPatch {
       }
       if (false && count > 0) {
         log("Patch all JVMs? (y/N) : ");
-        BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
-        String answer = in.readLine();
+        String answer;
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(System.in))) {
+          answer = in.readLine();
+        }
+
         if (!"y".equals(answer)) {
           System.exit(1);
           return;
